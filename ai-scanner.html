@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>AI-Сканер Етикеток | VetGuard</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        
+        #camera-container { position: relative; width: 100vw; height: 100dvh; }
+        video { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 2; pointer-events: none; }
+        
+        .ui-layer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 10; display: flex; flex-direction: column; justify-content: space-between; 
+            padding: 15px; padding-bottom: max(35px, env(safe-area-inset-bottom));
+            box-sizing: border-box; pointer-events: none; 
+        }
+        
+        .header-bar { display: flex; justify-content: space-between; pointer-events: auto; width: 100%; }
+        .back-btn { padding: 8px 12px; background: rgba(44, 62, 80, 0.7); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .status-badge { background: rgba(0,0,0,0.6); color: #3498db; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: bold; }
+        
+        /* Рамка сканера по центру */
+        .scanner-frame {
+            position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%);
+            width: 80%; height: 40%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 15px; box-shadow: 0 0 0 4000px rgba(0,0,0,0.5); /* Затемнення навколо рамки */
+            pointer-events: none; z-index: 5;
+        }
+        /* Куточки для краси */
+        .scanner-frame::before, .scanner-frame::after { content: ''; position: absolute; width: 30px; height: 30px; border-color: #3498db; border-style: solid; }
+        .scanner-frame::before { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 15px; }
+        .scanner-frame::after { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 15px; }
+
+        .controls-area { display: flex; flex-direction: column; align-items: center; pointer-events: auto; gap: 10px; width: 100%; z-index: 15;}
+        
+        /* Панель результатів з прокруткою (бо тексту може бути багато) */
+        .result-panel { 
+            display: none; background: rgba(0,0,0,0.85); color: #fff; 
+            padding: 20px; border-radius: 15px; text-align: left; 
+            border: 1px solid #3498db; width: 90%; max-width: 400px;
+            max-height: 50vh; overflow-y: auto; font-size: 14px; line-height: 1.5;
+        }
+        .result-panel h3 { margin: 0 0 10px 0; color: #f39c12; font-size: 18px; text-align: center;}
+        .result-panel .verdict { font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 10px; padding: 10px; border-radius: 8px;}
+        .verdict.ok { background: rgba(39, 174, 96, 0.3); color: #2ecc71; border: 1px solid #2ecc71; }
+        .verdict.warn { background: rgba(231, 76, 60, 0.3); color: #e74c3c; border: 1px solid #e74c3c; }
+
+        .capture-btn { background: #3498db; color: white; border: none; padding: 18px 30px; border-radius: 25px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 90%; max-width: 400px; }
+        
+        .btn-group { display: flex; gap: 10px; width: 90%; max-width: 400px; display: none; }
+        .btn-group button { flex: 1; padding: 15px; border: none; border-radius: 15px; font-weight: bold; color: white; cursor: pointer;}
+        #btn-retry { background: #7f8c8d; }
+        #btn-save { background: #27ae60; }
+    </style>
+</head>
+<body>
+    
+    <div id="camera-container">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas"></canvas>
+        <div class="scanner-frame" id="scanner-frame"></div>
+        
+        <div class="ui-layer">
+            <div class="header-bar">
+                <button class="back-btn" onclick="window.location.href='index.html'">← Меню</button>
+                <div class="status-badge" id="status-text">Наведіть на текст</div>
+            </div>
+            
+            <div class="controls-area">
+                <div class="result-panel" id="result-panel">
+                    <h3>Результат Аналізу</h3>
+                    <div id="verdict-box" class="verdict ok">✅ Все в нормі</div>
+                    <div id="analysis-text">Тут буде детальний розбір складу та термінів...</div>
+                </div>
+                
+                <button class="capture-btn" id="btn-capture">🔍 Сканувати етикетку</button>
+                
+                <div class="btn-group" id="btn-group">
+                    <button id="btn-retry">Нове фото</button>
+                    <button id="btn-save">Зберегти звіт</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/modules/ai-scanner.js"></script>
+
+</body>
+</html>
