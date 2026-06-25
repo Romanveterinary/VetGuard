@@ -7,9 +7,10 @@ const btnSave = document.getElementById('btn-save');
 const btnGroup = document.getElementById('btn-group');
 const statusText = document.getElementById('status-text');
 const resultPanel = document.getElementById('result-panel');
-const thermometerUi = document.getElementById('thermometer-ui');
 
-// Повзунок
+// Інтерактивні елементи
+const interactiveControls = document.getElementById('interactive-controls');
+const workshopSelect = document.getElementById('workshop-select');
 const tempSlider = document.getElementById('temp-slider');
 const tempDisplay = document.getElementById('temp-display');
 
@@ -20,6 +21,30 @@ const resSafety = document.getElementById('res-safety');
 const resRecommendations = document.getElementById('res-recommendations');
 
 let isVideoPlaying = false;
+let hideTimer;
+
+// --- ЛОГІКА ЗНИКАННЯ UI ---
+function resetHideTimer() {
+    // Якщо відео не грає (ми дивимось результати) - не застосовуємо таймер
+    if (!isVideoPlaying) return; 
+    
+    interactiveControls.classList.remove('hidden-controls');
+    interactiveControls.style.pointerEvents = 'auto'; // Повертаємо клікабельність
+    
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+        if (isVideoPlaying) {
+            interactiveControls.classList.add('hidden-controls');
+            interactiveControls.style.pointerEvents = 'none'; // Вимикаємо кліки, коли невидиме
+        }
+    }, 3000);
+}
+
+// Слухаємо тапи по екрану та активність на елементах
+document.body.addEventListener('click', resetHideTimer);
+document.body.addEventListener('touchstart', resetHideTimer);
+tempSlider.addEventListener('input', resetHideTimer);
+workshopSelect.addEventListener('change', resetHideTimer);
 
 // Оновлення цифри на екрані при русі повзунка
 tempSlider.addEventListener('input', (e) => {
@@ -47,6 +72,7 @@ async function init() {
     isVideoPlaying = true;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
+    resetHideTimer(); // Запускаємо таймер при старті
 }
 
 async function runWorkshopAudit() {
@@ -59,10 +85,11 @@ async function runWorkshopAudit() {
     if (isVideoPlaying) {
         video.pause();
         isVideoPlaying = false;
+        
         btnCapture.style.display = 'none';
-        thermometerUi.style.display = 'none'; // Ховаємо термометр після фіксації
+        interactiveControls.classList.add('hidden-controls'); // Ховаємо керування
 
-        statusText.innerText = "Жорсткий аудит цеху...";
+        statusText.innerText = "Аналіз з урахуванням специфіки цеху...";
         statusText.style.color = "#f1c40f";
         
         canvas.width = video.clientWidth;
@@ -70,31 +97,33 @@ async function runWorkshopAudit() {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-        // Беремо значення з нашого повзунка
+        // Збираємо точні дані від інспектора
         const declaredTemp = tempSlider.value;
+        const selectedWorkshop = workshopSelect.value;
 
-        const promptText = `Ти - Головний Аудитор з якості (QA Manager) та Санітарно-ветеринарний інспектор.
-        Зараз ти аналізуєш виробничий цех.
+        // ОНОВЛЕНИЙ ЖОРСТКИЙ ПРОМПТ ІЗ ТИПОМ ЦЕХУ
+        const promptText = `Ти - Головний Аудитор з якості (QA Manager) та Санітарно-ветеринарний інспектор в Україні.
         
-        ВВІДНІ ДАНІ ВІД ІНСПЕКТОРА:
-        Заявлена температура в цьому приміщенні: ${declaredTemp}°C.
+        ВВІДНІ ДАНІ ВІД ІНСПЕКТОРА (ЦЕ ФАКТ, БРАТИ ДО РОЗРАХУНКУ):
+        1. Тип об'єкта перевірки: ${selectedWorkshop}.
+        2. Заявлена температура в приміщенні: ${declaredTemp}°C.
 
-        Твоє завдання - провести аудит і повернути JSON з 4 розділами.
+        Твоє завдання - провести аудит фотографії саме для специфіки "${selectedWorkshop}".
 
         ПРАВИЛА ДЛЯ РОЗДІЛІВ 1, 2, 3 (ЖОРСТКІ ФАКТИ, БЕЗ ФАНТАЗІЙ):
-        1. "objective" (Об'єктивна картина): Опиши лише факти. Тип цеху, кількість людей, яке обладнання видно. Знайди фізичний термометр/табло на фото. Якщо знайшов - порівняй його цифру із заявленою (${declaredTemp}°C).
-        2. "sanitary" (Санітарія): Аналізуй закони НАССР та Закон №771. Перевір, чи відповідає температура ${declaredTemp}°C нормам для такого цеху. Знайди бруд, ящики на підлозі (це ризик перехресного забруднення), відсутність шапочок, брудні фартухи. Пиши тільки те, що реально бачиш. Якщо порушень немає - так і пиши.
-        3. "safety" (Охорона праці): Шукай критичні загрози життю: відкриті розетки біля мийок, дроти на підлозі, відсутність плафонів на лампах, іржу, зламане обладнання (напр. візки без коліс).
+        1. "objective": Опиши лише факти. Що бачиш на фото? Знайди фізичний термометр на фото (якщо є) і порівняй його цифру із заявленою (${declaredTemp}°C).
+        2. "sanitary": Аналізуй Закони України та норми НАССР САМЕ ДЛЯ "${selectedWorkshop}". Перевір, чи відповідає температура ${declaredTemp}°C жорстким нормам цього конкретного цеху. Знайди бруд, ящики на підлозі, перехресне забруднення, відсутність спец-одягу.
+        3. "safety": Шукай відкриті розетки біля мийок, дроти на підлозі, відсутність плафонів, іржу, зламане обладнання.
 
-        ПРАВИЛА ДЛЯ РОЗДІЛУ 4 (ТВОРЧІ РЕКОМЕНДАЦІЇ):
-        4. "recommendations" (Практичні поради): Тут ти дієш як досвідчений технолог-практик. Дай розгорнуті поради. Наприклад: якщо ящики на підлозі - порадь купити візки-піддони; якщо обладнання іржаве - порадь замінити; якщо ножі на столі - порадь магнітні тримачі; нагадай про кольорове маркування інвентарю.
+        ПРАВИЛА ДЛЯ РОЗДІЛУ 4 (РЕКОМЕНДАЦІЇ):
+        4. "recommendations": Практичні поради як технолог. Якщо ящики на підлозі - порадь візки; щодо інвентарю - нагадай про кольорове маркування дощок та ножів під цей тип цеху.
 
         Поверни ТІЛЬКИ JSON:
         {
           "objective": "Текст об'єктивної картини",
-          "sanitary": "Текст санітарних порушень (з посиланнями на закони або норми)",
-          "safety": "Текст порушень охорони праці та небезпек",
-          "recommendations": "Практичні поради для покращення процесів (використовуй маркери списку)"
+          "sanitary": "Текст санітарних порушень",
+          "safety": "Текст порушень охорони праці",
+          "recommendations": "Практичні поради"
         }`;
 
         const requestBody = {
@@ -104,10 +133,7 @@ async function runWorkshopAudit() {
                     { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                 ]
             }],
-            generationConfig: { 
-                responseMimeType: "application/json", 
-                temperature: 0.1 // Дуже низька температура для утримання ШІ в рамках фактів
-            }
+            generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
         };
 
         try {
@@ -123,10 +149,9 @@ async function runWorkshopAudit() {
             const resultText = data.candidates[0].content.parts[0].text;
             const parsedData = JSON.parse(resultText.trim());
 
-            statusText.innerText = "Аудит завершено";
+            statusText.innerText = `Аудит: ${selectedWorkshop}`;
             statusText.style.color = "#2ecc71";
 
-            // Рендер результатів (перетворюємо \n та ** у нормальні HTML теги)
             const formatText = (text) => text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
             resObjective.innerHTML = formatText(parsedData.objective);
@@ -151,17 +176,17 @@ function resetScanner() {
     isVideoPlaying = true;
     
     btnCapture.style.display = 'block';
-    thermometerUi.style.display = 'flex'; // Повертаємо термометр
     btnGroup.style.display = 'none';
     resultPanel.style.display = 'none';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    statusText.innerText = "Охопіть цех та термометр";
+    statusText.innerText = "Оберіть цех і тапайте по екрану";
     statusText.style.color = "#e67e22";
+    resetHideTimer(); // Перезапуск таймера
 }
 
 btnCapture.addEventListener('click', runWorkshopAudit);
 btnRetry.addEventListener('click', resetScanner);
-btnSave.addEventListener('click', () => { alert("Офіційний звіт інспектора збережено!"); resetScanner(); });
+btnSave.addEventListener('click', () => { alert("Офіційний звіт збережено!"); resetScanner(); });
 
 init();
