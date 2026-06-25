@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>ШІ-Лічильник | VetGuard Pro</title>
+    <title>ШІ-Лічильник (Gemini) | VetGuard Pro</title>
     <link rel="stylesheet" href="style.css">
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
@@ -11,24 +11,39 @@
         video { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
         canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 2; pointer-events: none; }
         
+        /* ХРЕСТИК ПРИЦІЛЮВАННЯ */
+        .crosshair {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 30px; height: 30px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 100;
+        }
+        .crosshair::before, .crosshair::after {
+            content: ''; position: absolute; background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 3px rgba(0,0,0,0.8);
+        }
+        .crosshair::before { top: 14px; left: 0; width: 30px; height: 2px; }
+        .crosshair::after { top: 0; left: 14px; width: 2px; height: 30px; }
+        
         .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; box-sizing: border-box; pointer-events: none; }
         .header-bar { display: flex; justify-content: space-between; pointer-events: auto; }
-        .back-btn { padding: 10px 15px; background: rgba(44, 62, 80, 0.8); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; backdrop-filter: blur(5px); }
-        .status-badge { background: rgba(0,0,0,0.6); color: white; padding: 10px 15px; border-radius: 10px; font-size: 14px; backdrop-filter: blur(5px); }
+        .back-btn { padding: 10px 15px; background: rgba(44, 62, 80, 0.8); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .status-badge { background: rgba(0,0,0,0.6); color: #f39c12; padding: 10px 15px; border-radius: 10px; font-size: 14px; font-weight: bold; text-align: right; max-width: 60%; }
         
-        /* Зона управління знизу */
-        .controls-area { display: flex; flex-direction: column; align-items: center; pointer-events: auto; margin-bottom: 30px; gap: 15px; }
+        .controls-area { display: flex; flex-direction: column; align-items: center; pointer-events: auto; margin-bottom: 30px; gap: 15px; width: 100%; }
         
-        /* Новий повзунок */
-        .slider-panel { background: rgba(0,0,0,0.7); color: white; padding: 15px 20px; border-radius: 15px; width: 80%; max-width: 300px; text-align: center; backdrop-filter: blur(5px); transition: opacity 0.5s ease; opacity: 1; }
-        .slider-panel.hidden { opacity: 0; pointer-events: none; }
-        .slider-panel label { display: block; margin-bottom: 10px; font-weight: bold; font-size: 14px; color: #bdc3c7; }
-        .slider-panel input[type=range] { width: 100%; accent-color: var(--offline-accent); }
+        /* Оновлена панель результатів */
+        .result-panel { display: none; background: rgba(0,0,0,0.8); color: #fff; padding: 15px 25px; border-radius: 15px; text-align: center; font-size: 1.2rem; font-weight: bold; border: 2px solid var(--cloud-accent); }
+        .result-panel .object-name { color: #bdc3c7; font-size: 1rem; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px;}
+        .result-panel span.count { color: var(--cloud-accent); font-size: 2.5rem; }
         
-        .result-panel { display: none; background: rgba(0,0,0,0.8); color: #fff; padding: 15px; border-radius: 15px; font-size: 1.5rem; font-weight: bold; backdrop-filter: blur(5px); }
-        .result-panel span { color: var(--offline-accent); font-size: 2.2rem; }
+        .capture-btn { background: var(--cloud-accent); color: white; border: none; padding: 18px 40px; border-radius: 30px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4); width: 90%; max-width: 400px; transition: transform 0.1s; }
+        .capture-btn:active { transform: scale(0.95); }
         
-        .capture-btn { background: var(--offline-accent); color: white; border: none; padding: 18px 40px; border-radius: 30px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+        /* Ховаємо хрестик під час аналізу */
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -36,28 +51,25 @@
     <div id="camera-container">
         <video id="video" autoplay playsinline muted></video>
         <canvas id="canvas"></canvas>
+        <div class="crosshair" id="crosshair"></div>
         
         <div class="ui-layer">
             <div class="header-bar">
                 <button class="back-btn" onclick="window.location.href='index.html'">← Меню</button>
-                <div class="status-badge" id="status-text">Ініціалізація ШІ...</div>
+                <div class="status-badge" id="status-text">Наведіть хрестик на ціль</div>
             </div>
             
             <div class="controls-area">
-                <div class="result-panel" id="result-panel">Знайдено: <span id="object-count">0</span></div>
-                
-                <div class="slider-panel" id="slider-panel">
-                    <label for="threshold-slider">Чутливість ШІ: <span id="threshold-val">50</span>%</label>
-                    <input type="range" id="threshold-slider" min="10" max="90" value="50">
+                <div class="result-panel" id="result-panel">
+                    <span class="object-name" id="detected-name">Розпізнано: ...</span>
+                    Знайдено: <span class="count" id="object-count">0</span>
                 </div>
                 
-                <button class="capture-btn" id="btn-capture">📸 Захопити і Рахувати</button>
+                <button class="capture-btn" id="btn-capture">✨ Рахувати те, що в центрі</button>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
     <script src="js/modules/ai-counter.js"></script>
 
 </body>
