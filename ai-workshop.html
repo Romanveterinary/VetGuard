@@ -19,16 +19,33 @@
             box-sizing: border-box; pointer-events: none; 
         }
         
-        .header-bar { display: flex; justify-content: space-between; pointer-events: auto; width: 100%; }
+        .header-bar { display: flex; justify-content: space-between; pointer-events: auto; width: 100%; z-index: 20;}
         .back-btn { padding: 8px 12px; background: rgba(44, 62, 80, 0.7); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .status-badge { background: rgba(0,0,0,0.6); color: #e67e22; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: bold; }
         
-        /* ВЕРТИКАЛЬНИЙ ТЕРМОМЕТР (Праворуч) */
+        /* БЛОК КЕРУВАННЯ (Список + Термометр), який буде зникати */
+        #interactive-controls {
+            position: absolute; top: 70px; right: 15px; left: 15px; bottom: 100px;
+            pointer-events: none; z-index: 15;
+            transition: opacity 0.4s ease-in-out;
+        }
+        .hidden-controls { opacity: 0; }
+
+        /* Випадаючий список цехів */
+        .workshop-dropdown {
+            position: absolute; top: 0; left: 0; width: 65%; max-width: 250px;
+            background: rgba(0,0,0,0.8); color: #fff; border: 1px solid #e67e22;
+            padding: 12px; border-radius: 12px; font-size: 16px; font-weight: bold;
+            pointer-events: auto; outline: none; appearance: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        /* Вертикальний термометр */
         .thermometer-container {
-            position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+            position: absolute; right: 0; top: 50px;
             display: flex; flex-direction: column; align-items: center;
-            background: rgba(0,0,0,0.7); padding: 15px 10px; border-radius: 20px;
-            pointer-events: auto; z-index: 15; border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.8); padding: 15px 10px; border-radius: 20px;
+            pointer-events: auto; border: 1px solid rgba(255,255,255,0.2);
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
         .temp-display { color: #e67e22; font-size: 22px; font-weight: bold; margin-bottom: 15px; }
@@ -41,14 +58,14 @@
             accent-color: #e67e22; cursor: grab;
         }
 
-        .controls-area { display: flex; flex-direction: column; align-items: center; pointer-events: auto; gap: 10px; width: 100%; z-index: 15;}
+        .controls-area { display: flex; flex-direction: column; align-items: center; pointer-events: auto; gap: 10px; width: 100%; z-index: 20;}
         
         /* ПАНЕЛЬ РЕЗУЛЬТАТІВ */
         .result-panel { 
             display: none; background: rgba(0,0,0,0.9); color: #fff; 
             padding: 15px; border-radius: 15px; text-align: left; 
             border: 1px solid #e67e22; width: 90%; max-width: 400px;
-            max-height: 65vh; overflow-y: auto; font-size: 14px; line-height: 1.4;
+            max-height: 60vh; overflow-y: auto; font-size: 14px; line-height: 1.4;
         }
         
         .section-title { font-size: 16px; font-weight: bold; margin: 15px 0 5px 0; padding-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2); }
@@ -56,7 +73,6 @@
         .sec-san { color: #e74c3c; }
         .sec-saf { color: #f1c40f; }
         .sec-rec { color: #2ecc71; }
-
         .content-box { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 5px; }
 
         .capture-btn { background: #e67e22; color: white; border: none; padding: 18px 30px; border-radius: 25px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 90%; max-width: 400px; }
@@ -73,19 +89,35 @@
         <video id="video" autoplay playsinline muted></video>
         <canvas id="canvas"></canvas>
         
-        <div class="thermometer-container" id="thermometer-ui">
-            <div class="temp-display" id="temp-display">+10°C</div>
-            <div class="temp-label">+30</div>
-            <div class="slider-wrapper">
-                <input type="range" min="-25" max="30" value="10" class="vertical-slider" id="temp-slider">
+        <div id="interactive-controls">
+            <select id="workshop-select" class="workshop-dropdown">
+                <option value="М'ясний цех">🥩 М'ясний цех</option>
+                <option value="Рибний цех">🐟 Рибний цех</option>
+                <option value="Кулінарний цех">🍲 Кулінарний цех</option>
+                <option value="Ковбасний цех">🌭 Ковбасний цех</option>
+                <option value="Коптильний цех">🥓 Коптильний цех</option>
+                <option value="Цех напівфабрикатів">🥟 Цех напівфабрикатів</option>
+                <option value="Цех приготування салатів">🥗 Цех приготування салатів</option>
+                <option value="Кондитерський цех">🍰 Кондитерський цех</option>
+                <option value="Кухня загальна">🍳 Кухня загальна</option>
+                <option value="Піцерія">🍕 Піцерія</option>
+                <option value="Кафе">☕ Кафе / Бар</option>
+            </select>
+
+            <div class="thermometer-container" id="thermometer-ui">
+                <div class="temp-display" id="temp-display">+10°C</div>
+                <div class="temp-label">+30</div>
+                <div class="slider-wrapper">
+                    <input type="range" min="-25" max="30" value="10" class="vertical-slider" id="temp-slider">
+                </div>
+                <div class="temp-label">-25</div>
             </div>
-            <div class="temp-label">-25</div>
         </div>
 
         <div class="ui-layer">
             <div class="header-bar">
                 <button class="back-btn" onclick="window.location.href='index.html'">← Меню</button>
-                <div class="status-badge" id="status-text">Охопіть цех та термометр</div>
+                <div class="status-badge" id="status-text">Оберіть цех і тапайте по екрану</div>
             </div>
             
             <div class="controls-area">
