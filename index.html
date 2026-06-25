@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>VetGuard Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div class="app-container">
+        <header class="main-header">
+            <div>
+                <h1>VetGuard</h1>
+                <p>Панель інструментів інспектора</p>
+            </div>
+            <button id="btn-settings" class="settings-btn">⚙️</button>
+        </header>
+
+        <main class="menu-grid">
+            <section class="menu-section">
+                <h2>Автономний блок (Офлайн)</h2>
+                <button class="menu-btn" id="btn-ruler">📏 AR-Рулетка та Площа</button>
+                <button class="menu-btn" id="btn-weight">⚖️ AR-Вага тварин</button>
+                <button class="menu-btn" id="btn-counter">📸 ШІ-Лічильник об'єктів</button>
+            </section>
+
+            <section class="menu-section">
+                <h2>Інтелектуальний блок (Gemini)</h2>
+                <button class="menu-btn" id="btn-sanitary">🧪 Санітарний Калькулятор</button>
+                <button class="menu-btn" id="btn-auditor">🛒 AI-Аудитор Вітрин</button>
+                <button class="menu-btn" id="btn-workshop">🏭 AI-Інспектор Цехів</button>
+                <button class="menu-btn" id="btn-warehouse">❄️ AI-Аудитор Складів</button>
+                <button class="menu-btn" id="btn-scanner">🏷️ AI-Сканер Етикеток</button>
+            </section>
+        </main>
+    </div>
+
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <h2>Налаштування ШІ</h2>
+            <p>Введіть ваш ключ Gemini API. Він буде збережений лише на цьому пристрої.</p>
+            
+            <div class="input-wrapper">
+                <input type="password" id="api-key-input" placeholder="Вставте ключ сюди...">
+                <button id="btn-toggle-visibility" type="button" title="Показати ключ">👁️</button>
+            </div>
+
+            <div class="modal-buttons">
+                <button id="btn-save-key" class="save-btn">Зберегти</button>
+                <button id="btn-close-settings" class="close-btn">Закрити</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

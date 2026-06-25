@@ -1,0 +1,220 @@
+/* =========================================
+   БАЗОВІ НАЛАШТУВАННЯ ТА КОЛЬОРИ
+   ========================================= */
+:root {
+    --primary-color: #2c3e50;
+    --text-color: #333333;
+    --bg-color: #f4f7f6;
+    --card-bg: #ffffff;
+    --offline-accent: #27ae60; /* Зелений для офлайн */
+    --cloud-accent: #8e44ad;   /* Фіолетовий для ШІ */
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.app-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* =========================================
+   ШАПКА (HEADER) ТА КНОПКА НАЛАШТУВАНЬ
+   ========================================= */
+.main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-top: 10px;
+    text-align: left;
+}
+
+.main-header h1 {
+    color: var(--primary-color);
+    font-size: 2.2rem;
+    margin-bottom: 5px;
+}
+
+.main-header p {
+    color: #7f8c8d;
+    font-size: 1rem;
+}
+
+.settings-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+.settings-btn:hover {
+    transform: rotate(90deg);
+}
+
+/* =========================================
+   СЕКЦІЇ ГОЛОВНОГО МЕНЮ
+   ========================================= */
+.menu-section {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    margin-bottom: 25px;
+}
+
+.menu-section h2 {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+}
+
+/* Кольорові підкреслення для різних блоків */
+.menu-section:nth-child(1) h2 {
+    color: var(--offline-accent);
+    border-bottom-color: var(--offline-accent);
+}
+
+.menu-section:nth-child(2) h2 {
+    color: var(--cloud-accent);
+    border-bottom-color: var(--cloud-accent);
+}
+
+/* =========================================
+   КНОПКИ ІНСТРУМЕНТІВ
+   ========================================= */
+.menu-btn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    margin-bottom: 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    font-size: 1.05rem;
+    font-weight: bold;
+    text-align: left;
+    color: var(--primary-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.menu-btn:last-child {
+    margin-bottom: 0;
+}
+
+.menu-btn:hover, .menu-btn:active {
+    background-color: #e2e6ea;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* =========================================
+   МОДАЛЬНЕ ВІКНО НАЛАШТУВАНЬ (API КЛЮЧ)
+   ========================================= */
+.modal {
+    display: none; /* Сховане за замовчуванням */
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(3px);
+}
+
+.modal-content {
+    background-color: white;
+    padding: 25px;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.modal-content h2 { 
+    margin-top: 0; 
+    color: var(--primary-color); 
+}
+
+.modal-content p { 
+    font-size: 0.9rem; 
+    color: #7f8c8d; 
+    margin-bottom: 15px; 
+}
+
+/* =========================================
+   ПОЛЕ ВВЕДЕННЯ З КНОПКОЮ "ОКО"
+   ========================================= */
+.input-wrapper {
+    position: relative;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+#api-key-input {
+    width: 100%;
+    padding: 12px;
+    padding-right: 45px; /* Місце для ока */
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+#btn-toggle-visibility {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+#btn-toggle-visibility:hover {
+    opacity: 1;
+}
+
+/* =========================================
+   КНОПКИ В МОДАЛЬНОМУ ВІКНІ
+   ========================================= */
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.modal-buttons button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.save-btn { 
+    background-color: var(--offline-accent); 
+    color: white; 
+}
+
+.close-btn { 
+    background-color: #e74c3c; 
+    color: white; 
+}

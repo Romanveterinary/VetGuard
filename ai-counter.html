@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ШІ-Лічильник | VetGuard Pro</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        /* Специфічний дизайн тільки для камери лічильника */
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #000; /* Чорний фон під камерою */
+        }
+        
+        #camera-container { 
+            position: relative; 
+            width: 100vw; 
+            height: 100vh; 
+        }
+        
+        /* Відео з камери на весь екран */
+        video { 
+            position: absolute; 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            z-index: 1; 
+        }
+        
+        /* Прозоре полотно, на якому ШІ малюватиме рамки */
+        canvas { 
+            position: absolute; 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            z-index: 2; 
+            pointer-events: none; 
+        }
+        
+        /* Інтерфейс поверх камери */
+        .ui-layer { 
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            z-index: 10; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            padding: 20px; 
+            box-sizing: border-box; 
+            pointer-events: none; /* Щоб не блокувати натискання */
+        }
+        
+        .header-bar { 
+            display: flex; 
+            justify-content: space-between; 
+            pointer-events: auto; 
+        }
+        
+        .back-btn { 
+            padding: 10px 15px; 
+            background: rgba(44, 62, 80, 0.8); 
+            color: white; 
+            border: none; 
+            border-radius: 10px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            backdrop-filter: blur(5px);
+        }
+        
+        .status-badge { 
+            background: rgba(0,0,0,0.6); 
+            color: white; 
+            padding: 10px 15px; 
+            border-radius: 10px; 
+            font-size: 14px; 
+            backdrop-filter: blur(5px);
+        }
+        
+        /* Блок управління внизу екрана */
+        .controls { 
+            text-align: center; 
+            pointer-events: auto; 
+            margin-bottom: 30px; 
+        }
+        
+        .capture-btn { 
+            background: var(--offline-accent); 
+            color: white; 
+            border: none; 
+            padding: 18px 40px; 
+            border-radius: 30px; 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+            cursor: pointer; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4); 
+            transition: transform 0.1s;
+        }
+        
+        .capture-btn:active { transform: scale(0.95); }
+        
+        /* Панель, де з'явиться цифра (наприклад, "Знайдено: 12") */
+        .result-panel { 
+            display: none; /* Спочатку ховаємо */
+            background: rgba(0,0,0,0.8); 
+            color: #fff; 
+            padding: 15px; 
+            border-radius: 15px; 
+            font-size: 1.5rem; 
+            font-weight: bold; 
+            margin-bottom: 20px; 
+            backdrop-filter: blur(5px);
+        }
+        
+        .result-panel span { 
+            color: var(--offline-accent); 
+            font-size: 2.2rem; 
+        }
+    </style>
+</head>
+<body>
+    
+    <div id="camera-container">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas"></canvas>
+        
+        <div class="ui-layer">
+            <div class="header-bar">
+                <button class="back-btn" onclick="window.location.href='index.html'">← Меню</button>
+                <div class="status-badge" id="status-text">Ініціалізація ШІ...</div>
+            </div>
+            
+            <div class="controls">
+                <div class="result-panel" id="result-panel">Знайдено: <span id="object-count">0</span></div>
+                <button class="capture-btn" id="btn-capture">📸 Захопити і Рахувати</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    
+    <script src="js/modules/ai-counter.js"></script>
+
+</body>
+</html>
