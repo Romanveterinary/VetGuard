@@ -13,7 +13,7 @@ const analysisText = document.getElementById('analysis-text');
 
 let isVideoPlaying = false;
 
-// 1. Увімкнення камери (стандартно з автофокусом)
+// 1. Увімкнення камери
 async function setupCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -36,7 +36,7 @@ async function init() {
     canvas.height = video.videoHeight;
 }
 
-// 2. Сканування тексту через Gemini
+// 2. Жорстке сканування тексту
 async function scanLabel() {
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
@@ -45,14 +45,13 @@ async function scanLabel() {
     }
 
     if (isVideoPlaying) {
-        // Заморожуємо кадр
         video.pause();
         isVideoPlaying = false;
         
         scannerFrame.style.display = 'none';
         btnCapture.style.display = 'none';
 
-        statusText.innerText = "Читаю текст... Зачекайте";
+        statusText.innerText = "Суворий аналіз... Зачекайте";
         statusText.style.color = "#f1c40f";
         
         canvas.width = video.clientWidth;
@@ -61,19 +60,21 @@ async function scanLabel() {
         
         const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-        // Промпт для інспектора
-        const promptText = `Ти - суворий санітарний та ветеринарний інспектор.
-        Прочитай ВЕСЬ текст на цій етикетці.
-        Зроби аналіз:
-        1. Знайди терміни придатності (якщо є) і скажи, чи вони актуальні (зараз 2026 рік).
-        2. Проаналізуй склад на наявність підозрілих або заборонених інгредієнтів.
-        3. Знайди інформацію про виробника та умови зберігання.
-        
+        // МАКСИМАЛЬНО ЖОРСТКИЙ ПРОМПТ
+        const promptText = `Ти - максимально суворий і безкомпромісний державний санітарно-ветеринарний інспектор.
+        Твоє завдання - проаналізувати текст на цій етикетці.
+
+        ЖОРСТКІ ПРАВИЛА:
+        1. ЖОДНИХ ФАНТАЗІЙ. Читаєш ТІЛЬКИ те, що чітко видно. Якщо текст розмитий, обрізаний або його немає - пиши "Нерозбірливо" або "Відсутнє". Не вгадуй жодного слова чи цифри!
+        2. Якщо на фото немає дати виготовлення або терміну придатності - це автоматичне ПОРУШЕННЯ (VIOLATION).
+        3. Шукай заборонені добавки, алергени або порушення маркування.
+        4. Поточний рік - 2026. Враховуй це при жорсткій перевірці термінів придатності.
+
         Поверни результат ТІЛЬКИ у форматі JSON із такою структурою:
         {
           "status": "OK" або "VIOLATION",
-          "verdict_title": "Короткий вердикт українською (напр. 'Порушень не виявлено' або 'Прострочено / Підозрілий склад')",
-          "details": "Детальний текст твого розбору: що знайшов, що прочитав, до чого є питання. Можна використовувати markdown (жирний шрифт, списки) для гарного форматування."
+          "verdict_title": "Короткий суворий вердикт (напр. 'Порушень не виявлено' або 'Відсутня дата / Прострочено')",
+          "details": "Детальний розбір: 1) Терміни: [твої знахідки], 2) Склад: [твої знахідки], 3) Виробник: [твої знахідки]. Чітко вкажи, якщо чогось не вистачає."
         }
         Не додавай ніякого іншого тексту поза JSON.`;
 
@@ -84,7 +85,10 @@ async function scanLabel() {
                     { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                 ]
             }],
-            generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+            generationConfig: { 
+                responseMimeType: "application/json", 
+                temperature: 0.0 // ПОВНІСТЮ ВИМИКАЄМО ФАНТАЗІЮ
+            }
         };
 
         try {
@@ -100,8 +104,7 @@ async function scanLabel() {
             const resultText = data.candidates[0].content.parts[0].text;
             const parsedData = JSON.parse(resultText.trim());
 
-            // Відображаємо результати
-            statusText.innerText = "Аналіз завершено";
+            statusText.innerText = "Перевірку завершено";
             statusText.style.color = "#2ecc71";
 
             if (parsedData.status === "VIOLATION") {
@@ -112,7 +115,6 @@ async function scanLabel() {
                 verdictBox.innerHTML = `✅ ${parsedData.verdict_title}`;
             }
 
-            // Рендеримо текст (замінюємо *жирний* та \n на HTML теги для краси)
             let formattedText = parsedData.details.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
             analysisText.innerHTML = formattedText;
 
@@ -144,6 +146,6 @@ function resetScanner() {
 
 btnCapture.addEventListener('click', scanLabel);
 btnRetry.addEventListener('click', resetScanner);
-btnSave.addEventListener('click', () => { alert("Звіт збережено до бази!"); resetScanner(); });
+btnSave.addEventListener('click', () => { alert("Суворий звіт збережено!"); resetScanner(); });
 
 init();
