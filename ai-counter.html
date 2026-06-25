@@ -25,10 +25,11 @@
 
         .controls-area { display: flex; flex-direction: column; align-items: center; pointer-events: auto; margin-bottom: 30px; gap: 15px; width: 100%; }
         
-        .result-panel { display: none; background: rgba(0,0,0,0.8); color: #fff; padding: 10px 20px; border-radius: 15px; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--cloud-accent); box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        /* Оновлена панель результатів */
+        .result-panel { display: none; background: rgba(0,0,0,0.8); color: #fff; padding: 15px 20px; border-radius: 15px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--cloud-accent); box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 90%; max-width: 300px; }
+        .detected-name { font-size: 1rem; color: #bdc3c7; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
         .result-panel span { color: var(--cloud-accent); font-size: 2.2rem; }
         
-        /* НОВИЙ ПОВЗУНОК */
         .slider-panel { display: none; background: rgba(0,0,0,0.8); color: white; padding: 15px 20px; border-radius: 15px; width: 90%; max-width: 300px; text-align: center; border: 1px solid var(--cloud-accent); }
         .slider-panel label { display: block; margin-bottom: 10px; font-weight: bold; font-size: 14px; color: #bdc3c7; }
         .slider-panel input[type=range] { width: 100%; accent-color: var(--cloud-accent); }
@@ -41,7 +42,6 @@
     <div id="camera-container">
         <video id="video" autoplay playsinline muted></video>
         <canvas id="canvas"></canvas>
-        
         <div class="crosshair"><div class="crosshair-center"></div></div>
         
         <div class="ui-layer">
@@ -51,7 +51,10 @@
             </div>
             
             <div class="controls-area">
-                <div class="result-panel" id="result-panel">Знайдено: <span id="object-count">0</span></div>
+                <div class="result-panel" id="result-panel">
+                    <div class="detected-name" id="detected-name">Об'єкт: ...</div>
+                    Кількість: <span id="object-count">0</span>
+                </div>
                 
                 <div class="slider-panel" id="slider-panel">
                     <label for="sensitivity-slider">Точність збігу: <span id="sensitivity-val">50</span>%</label>
