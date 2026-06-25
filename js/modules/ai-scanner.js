@@ -1,0 +1,149 @@
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const btnCapture = document.getElementById('btn-capture');
+const btnRetry = document.getElementById('btn-retry');
+const btnSave = document.getElementById('btn-save');
+const btnGroup = document.getElementById('btn-group');
+const scannerFrame = document.getElementById('scanner-frame');
+const statusText = document.getElementById('status-text');
+const resultPanel = document.getElementById('result-panel');
+const verdictBox = document.getElementById('verdict-box');
+const analysisText = document.getElementById('analysis-text');
+
+let isVideoPlaying = false;
+
+// 1. Увімкнення камери (стандартно з автофокусом)
+async function setupCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment', advanced: [{ focusMode: "continuous" }] }, 
+            audio: false 
+        });
+        video.srcObject = stream;
+        return new Promise((resolve) => { video.onloadedmetadata = () => resolve(video); });
+    } catch (error) {
+        statusText.innerText = "Помилка камери!";
+        statusText.style.color = "#e74c3c";
+    }
+}
+
+async function init() {
+    await setupCamera();
+    video.play();
+    isVideoPlaying = true;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+}
+
+// 2. Сканування тексту через Gemini
+async function scanLabel() {
+    const apiKey = localStorage.getItem('gemini_api_key');
+    if (!apiKey) {
+        alert("Увага! Спочатку введіть свій Gemini API ключ у налаштуваннях.");
+        return;
+    }
+
+    if (isVideoPlaying) {
+        // Заморожуємо кадр
+        video.pause();
+        isVideoPlaying = false;
+        
+        scannerFrame.style.display = 'none';
+        btnCapture.style.display = 'none';
+
+        statusText.innerText = "Читаю текст... Зачекайте";
+        statusText.style.color = "#f1c40f";
+        
+        canvas.width = video.clientWidth;
+        canvas.height = video.clientHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+        // Промпт для інспектора
+        const promptText = `Ти - суворий санітарний та ветеринарний інспектор.
+        Прочитай ВЕСЬ текст на цій етикетці.
+        Зроби аналіз:
+        1. Знайди терміни придатності (якщо є) і скажи, чи вони актуальні (зараз 2026 рік).
+        2. Проаналізуй склад на наявність підозрілих або заборонених інгредієнтів.
+        3. Знайди інформацію про виробника та умови зберігання.
+        
+        Поверни результат ТІЛЬКИ у форматі JSON із такою структурою:
+        {
+          "status": "OK" або "VIOLATION",
+          "verdict_title": "Короткий вердикт українською (напр. 'Порушень не виявлено' або 'Прострочено / Підозрілий склад')",
+          "details": "Детальний текст твого розбору: що знайшов, що прочитав, до чого є питання. Можна використовувати markdown (жирний шрифт, списки) для гарного форматування."
+        }
+        Не додавай ніякого іншого тексту поза JSON.`;
+
+        const requestBody = {
+            contents: [{
+                parts: [
+                    { text: promptText },
+                    { inline_data: { mime_type: "image/jpeg", data: base64Image } }
+                ]
+            }],
+            generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+        };
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) throw new Error("Помилка API");
+
+            const data = await response.json();
+            const resultText = data.candidates[0].content.parts[0].text;
+            const parsedData = JSON.parse(resultText.trim());
+
+            // Відображаємо результати
+            statusText.innerText = "Аналіз завершено";
+            statusText.style.color = "#2ecc71";
+
+            if (parsedData.status === "VIOLATION") {
+                verdictBox.className = "verdict warn";
+                verdictBox.innerHTML = `❌ ${parsedData.verdict_title}`;
+            } else {
+                verdictBox.className = "verdict ok";
+                verdictBox.innerHTML = `✅ ${parsedData.verdict_title}`;
+            }
+
+            // Рендеримо текст (замінюємо *жирний* та \n на HTML теги для краси)
+            let formattedText = parsedData.details.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            analysisText.innerHTML = formattedText;
+
+            resultPanel.style.display = 'block';
+            btnGroup.style.display = 'flex';
+
+        } catch (error) {
+            statusText.innerText = "Помилка розпізнавання!";
+            statusText.style.color = "#e74c3c";
+            alert("Не вдалося прочитати текст. Спробуйте навести чіткіше або перевірте інтернет.");
+            resetScanner();
+        }
+    }
+}
+
+function resetScanner() {
+    video.play();
+    isVideoPlaying = true;
+    
+    btnCapture.style.display = 'block';
+    scannerFrame.style.display = 'block';
+    btnGroup.style.display = 'none';
+    resultPanel.style.display = 'none';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    statusText.innerText = "Наведіть на текст";
+    statusText.style.color = "#3498db";
+}
+
+btnCapture.addEventListener('click', scanLabel);
+btnRetry.addEventListener('click', resetScanner);
+btnSave.addEventListener('click', () => { alert("Звіт збережено до бази!"); resetScanner(); });
+
+init();
