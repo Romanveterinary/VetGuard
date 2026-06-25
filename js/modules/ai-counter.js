@@ -6,7 +6,13 @@ const statusText = document.getElementById('status-text');
 const resultPanel = document.getElementById('result-panel');
 const objectCountSpan = document.getElementById('object-count');
 
+// Змінні повзунка
+const sliderPanel = document.getElementById('slider-panel');
+const sensitivitySlider = document.getElementById('sensitivity-slider');
+const sensitivityVal = document.getElementById('sensitivity-val');
+
 let isVideoPlaying = false;
+let currentDetections = []; // Зберігаємо сирі дані від ШІ
 
 // 1. Увімкнення камери
 async function setupCamera() {
@@ -15,7 +21,7 @@ async function setupCamera() {
         video.srcObject = stream;
         return new Promise((resolve) => { video.onloadedmetadata = () => resolve(video); });
     } catch (error) {
-        statusText.innerText = "Помилка доступу до камери!";
+        statusText.innerText = "Помилка камери!";
         statusText.style.color = "#e74c3c";
     }
 }
@@ -28,7 +34,41 @@ async function init() {
     canvas.height = video.videoHeight;
 }
 
-// 2. Відправка кадру до Gemini 2.5
+// Функція малювання крапок в залежності від повзунка
+function drawDetections() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // Очищаємо старі крапки
+    let count = 0;
+    const threshold = parseInt(sensitivitySlider.value, 10);
+
+    currentDetections.forEach(item => {
+        // Малюємо тільки ті, в яких ШІ впевнений більше, ніж обрано на повзунку
+        if (item.box && item.box.length === 4 && item.confidence >= threshold) {
+            count++;
+            const [ymin, xmin, ymax, xmax] = item.box;
+            const centerX = ((xmin + xmax) / 2 / 1000) * canvas.width;
+            const centerY = ((ymin + ymax) / 2 / 1000) * canvas.height;
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = '#2ecc71'; 
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#ffffff'; 
+            ctx.stroke();
+        }
+    });
+    
+    objectCountSpan.innerText = count;
+}
+
+// Слухаємо рух повзунка і миттєво перемальовуємо
+sensitivitySlider.addEventListener('input', (e) => {
+    sensitivityVal.innerText = e.target.value;
+    drawDetections();
+});
+
+
+// 2. Відправка кадру до Gemini
 async function countWithGemini() {
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
@@ -37,7 +77,7 @@ async function countWithGemini() {
     }
 
     if (isVideoPlaying) {
-        // --- ЗАМОРОЖУЄМО КАДР ---
+        // ЗАМОРОЖУЄМО КАДР
         video.pause();
         isVideoPlaying = false;
         
@@ -49,7 +89,6 @@ async function countWithGemini() {
         canvas.height = video.clientHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Конвертація кадру у Base64
         const captureCanvas = document.createElement('canvas');
         captureCanvas.width = video.videoWidth;
         captureCanvas.height = video.videoHeight;
@@ -58,13 +97,15 @@ async function countWithGemini() {
         
         const base64Image = captureCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-        // --- НОВИЙ МАГІЧНИЙ ПРОМПТ ДЛЯ РОЗПІЗНАВАННЯ ПО ЦЕНТРУ ---
+        // ОНОВЛЕНИЙ ПРОМПТ (тепер просимо ще й confidence)
         const promptText = `Analyze this image carefully. 
-        Step 1: Look EXACTLY at the center point of this image and identify the main object located there. 
-        Step 2: Find ALL instances of this exact same type of object across the entire image (including the one in the center). 
-        Step 3: Return ONLY a JSON array. Each element in the array must be an object with a single property 'box' which contains an array of 4 numbers [ymin, xmin, ymax, xmax] representing the bounding box of the object. The numbers must be scaled from 0 to 1000. 
-        Example: [{"box": [100, 200, 300, 400]}]. 
-        Do not return markdown, text, or anything else, ONLY the raw JSON array. If no objects are found, return [].`;
+        Step 1: Look EXACTLY at the center point and identify the main object there. 
+        Step 2: Find ALL instances of this exact same type of object across the image. 
+        Step 3: Return ONLY a JSON array. Each object in the array must have TWO properties:
+        - 'box': an array of 4 numbers [ymin, xmin, ymax, xmax] scaled from 0 to 1000.
+        - 'confidence': an integer from 1 to 100 estimating how confident you are that this is the same type of object.
+        Example: [{"box": [100, 200, 300, 400], "confidence": 85}]. 
+        Do not return markdown. Return ONLY the raw JSON array. If no objects are found, return [].`;
 
         const requestBody = {
             contents: [{
@@ -73,10 +114,7 @@ async function countWithGemini() {
                     { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                 ]
             }],
-            generationConfig: { 
-                responseMimeType: "application/json",
-                temperature: 0.1 
-            }
+            generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
         };
 
         try {
@@ -88,54 +126,31 @@ async function countWithGemini() {
                 body: JSON.stringify(requestBody)
             });
 
-            if (!response.ok) throw new Error(`Помилка API Gemini: ${response.status}`);
+            if (!response.ok) throw new Error(`Помилка API Gemini`);
 
             const data = await response.json();
             const resultText = data.candidates[0].content.parts[0].text;
             
-            let boxes = [];
             try {
-                boxes = JSON.parse(resultText.trim());
-            } catch (e) {
-                console.error("Gemini повернув не JSON:", resultText);
-                throw new Error("Збій розпізнавання формату");
-            }
+                currentDetections = JSON.parse(resultText.trim());
+            } catch (e) { throw new Error("Збій розпізнавання формату"); }
 
-            // --- МАЛЮЄМО МАРКЕРИ ---
-            let count = 0;
-            boxes.forEach(item => {
-                if (item.box && item.box.length === 4) {
-                    count++;
-                    const [ymin, xmin, ymax, xmax] = item.box;
-                    
-                    const centerX = ((xmin + xmax) / 2 / 1000) * canvas.width;
-                    const centerY = ((ymin + ymax) / 2 / 1000) * canvas.height;
-
-                    // Малюємо яскраву зелену крапку на знайдених об'єктах
-                    ctx.beginPath();
-                    ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI);
-                    ctx.fillStyle = '#2ecc71'; 
-                    ctx.fill();
-                    ctx.lineWidth = 3;
-                    ctx.strokeStyle = '#ffffff'; 
-                    ctx.stroke();
-                }
-            });
+            // Показуємо панель результатів та повзунок, малюємо первинні крапки
+            resultPanel.style.display = 'block';
+            sliderPanel.style.display = 'block';
+            drawDetections(); // Викликаємо функцію малювання
 
             statusText.innerText = "Готово!";
             statusText.style.color = "#2ecc71";
-            objectCountSpan.innerText = count;
-            resultPanel.style.display = 'block';
 
         } catch (error) {
-            console.error(error);
             statusText.innerText = "Помилка розпізнавання!";
             statusText.style.color = "#e74c3c";
-            alert("Сталася помилка при зверненні до ШІ. Спробуйте навести чіткіше на об'єкт.");
+            alert("Сталася помилка при зверненні до ШІ.");
         }
 
     } else {
-        // --- ПОВЕРНЕННЯ В РЕЖИМ КАМЕРИ ---
+        // ПОВЕРНЕННЯ В РЕЖИМ КАМЕРИ
         video.play();
         isVideoPlaying = true;
         btnCapture.innerText = "🎯 Фіксація та Підрахунок";
@@ -143,7 +158,9 @@ async function countWithGemini() {
         statusText.style.color = "#f39c12";
         
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        currentDetections = []; // Очищаємо пам'ять
         resultPanel.style.display = 'none';
+        sliderPanel.style.display = 'none'; // Ховаємо повзунок
     }
 }
 
