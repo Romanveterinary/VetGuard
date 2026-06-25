@@ -5,14 +5,14 @@ const btnCapture = document.getElementById('btn-capture');
 const statusText = document.getElementById('status-text');
 const resultPanel = document.getElementById('result-panel');
 const objectCountSpan = document.getElementById('object-count');
+const detectedNameSpan = document.getElementById('detected-name');
 
-// Змінні повзунка
 const sliderPanel = document.getElementById('slider-panel');
 const sensitivitySlider = document.getElementById('sensitivity-slider');
 const sensitivityVal = document.getElementById('sensitivity-val');
 
 let isVideoPlaying = false;
-let currentDetections = []; // Зберігаємо сирі дані від ШІ
+let currentDetections = []; 
 
 // 1. Увімкнення камери
 async function setupCamera() {
@@ -34,14 +34,13 @@ async function init() {
     canvas.height = video.videoHeight;
 }
 
-// Функція малювання крапок в залежності від повзунка
+// Функція малювання крапок
 function drawDetections() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Очищаємо старі крапки
+    ctx.clearRect(0, 0, canvas.width, canvas.height); 
     let count = 0;
     const threshold = parseInt(sensitivitySlider.value, 10);
 
     currentDetections.forEach(item => {
-        // Малюємо тільки ті, в яких ШІ впевнений більше, ніж обрано на повзунку
         if (item.box && item.box.length === 4 && item.confidence >= threshold) {
             count++;
             const [ymin, xmin, ymax, xmax] = item.box;
@@ -61,28 +60,25 @@ function drawDetections() {
     objectCountSpan.innerText = count;
 }
 
-// Слухаємо рух повзунка і миттєво перемальовуємо
 sensitivitySlider.addEventListener('input', (e) => {
     sensitivityVal.innerText = e.target.value;
     drawDetections();
 });
 
-
-// 2. Відправка кадру до Gemini
+// 2. Жорсткий запит до Gemini
 async function countWithGemini() {
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
-        alert("Увага! Спочатку введіть свій Gemini API ключ у налаштуваннях (Головне меню ⚙️).");
+        alert("Увага! Спочатку введіть свій Gemini API ключ у налаштуваннях.");
         return;
     }
 
     if (isVideoPlaying) {
-        // ЗАМОРОЖУЄМО КАДР
         video.pause();
         isVideoPlaying = false;
         
         btnCapture.innerText = "🔄 Очистити і продовжити";
-        statusText.innerText = "Аналізую ціль у центрі...";
+        statusText.innerText = "Ідентифікація цілі...";
         statusText.style.color = "#f1c40f";
         
         canvas.width = video.clientWidth;
@@ -97,15 +93,18 @@ async function countWithGemini() {
         
         const base64Image = captureCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-        // ОНОВЛЕНИЙ ПРОМПТ (тепер просимо ще й confidence)
-        const promptText = `Analyze this image carefully. 
-        Step 1: Look EXACTLY at the center point and identify the main object there. 
-        Step 2: Find ALL instances of this exact same type of object across the image. 
-        Step 3: Return ONLY a JSON array. Each object in the array must have TWO properties:
-        - 'box': an array of 4 numbers [ymin, xmin, ymax, xmax] scaled from 0 to 1000.
-        - 'confidence': an integer from 1 to 100 estimating how confident you are that this is the same type of object.
-        Example: [{"box": [100, 200, 300, 400], "confidence": 85}]. 
-        Do not return markdown. Return ONLY the raw JSON array. If no objects are found, return [].`;
+        // МАКСИМАЛЬНО ЖОРСТКИЙ ПРОМПТ
+        const promptText = `Act as a strict, non-creative computer vision scanner.
+        Step 1: Look EXACTLY at the center pixel of this image. Identify the primary object located there. Name it in Ukrainian (e.g., 'Свиня', 'Автомобіль', 'Ящик', 'Людина').
+        Step 2: Scan the entire image and find ALL instances of this exact same object type. DO NOT count different objects.
+        Step 3: Return ONLY a JSON object with this exact structure:
+        {
+          "objectName": "Назва об'єкта українською",
+          "detections": [
+             {"box": [ymin, xmin, ymax, xmax], "confidence": integer_from_1_to_100}
+          ]
+        }
+        The 'box' values must be integers scaled from 0 to 1000. Do not write markdown, do not add any extra text. Return ONLY the JSON object.`;
 
         const requestBody = {
             contents: [{
@@ -114,11 +113,14 @@ async function countWithGemini() {
                     { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                 ]
             }],
-            generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+            generationConfig: { 
+                responseMimeType: "application/json", 
+                temperature: 0.0 // НУЛЬ ФАНТАЗІЇ
+            }
         };
 
         try {
-            statusText.innerText = "Gemini шукає збіги...";
+            statusText.innerText = "Gemini рахує...";
             
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
@@ -132,13 +134,17 @@ async function countWithGemini() {
             const resultText = data.candidates[0].content.parts[0].text;
             
             try {
-                currentDetections = JSON.parse(resultText.trim());
-            } catch (e) { throw new Error("Збій розпізнавання формату"); }
+                // Парсимо новий формат (Словник, а не масив)
+                const parsedData = JSON.parse(resultText.trim());
+                detectedNameSpan.innerText = `Ціль: ${parsedData.objectName || 'Невідомо'}`;
+                currentDetections = parsedData.detections || [];
+            } catch (e) { 
+                throw new Error("Збій розпізнавання формату"); 
+            }
 
-            // Показуємо панель результатів та повзунок, малюємо первинні крапки
             resultPanel.style.display = 'block';
             sliderPanel.style.display = 'block';
-            drawDetections(); // Викликаємо функцію малювання
+            drawDetections(); 
 
             statusText.innerText = "Готово!";
             statusText.style.color = "#2ecc71";
@@ -158,9 +164,9 @@ async function countWithGemini() {
         statusText.style.color = "#f39c12";
         
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        currentDetections = []; // Очищаємо пам'ять
+        currentDetections = []; 
         resultPanel.style.display = 'none';
-        sliderPanel.style.display = 'none'; // Ховаємо повзунок
+        sliderPanel.style.display = 'none'; 
     }
 }
 
