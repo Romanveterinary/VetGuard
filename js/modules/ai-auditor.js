@@ -50,31 +50,23 @@ async function sendImageToGemini(base64Image) {
     statusText.innerText = "Аналізую вітрину...";
     statusText.style.color = "#f1c40f";
 
-    // ВИПРАВЛЕНИЙ ПРОМПТ (Чистий JSON)
-    const promptText = `Проаналізуй цю вітрину або розкладку товарів. Ти виконуєш дві ролі.
+    const promptText = `Проаналізуй цю вітрину.
+    РОЛЬ 1: САНІТАРНИЙ ІНСПЕКТОР (Україна)
+    Шукай фактичні порушення: Наказ №185 п.16 (Товарне сусідство сирого і готового), Закон №771 ст.49 (Гігієна: бруд, відсутність екранів). 
+    Якщо є бруд або пошкодження - вимагай генеральне прибирання або ремонт.
+    
+    РОЛЬ 2: МЕРЧАНДАЙЗЕР
+    Дай 2-3 поради, як переставити товари для збільшення продажів (колір, правило золотої полиці).
 
-    РОЛЬ 1: СУВОРИЙ САНІТАРНИЙ ІНСПЕКТОР (Україна)
-    Шукай виключно фактичні порушення:
-    - Наказ №185 п.16 (Товарне сусідство): Заборонено сире м'ясо/рибу поруч із готовими продуктами.
-    - Закон №771 ст.49 (Гігієна): Наявність бруду на лотках, відсутність захисних екранів, нагромадження.
-    ОБОВ'ЯЗКОВЕ ПРАВИЛО: Якщо на фото виявлено бруд, пошкодження, іржу або порушення цілісності поверхонь, обов'язково включи у свій звіт сувору рекомендацію провести генеральне прибирання, дезінфекцію або ремонт.
-
-    РОЛЬ 2: ТОП-МЕРЧАНДАЙЗЕР (Маркетинг)
-    Дай 2-3 практичні поради, як переставити ці ж товари, щоб вітрина виглядала дорожче і продавала більше.
-
-    ПРАВИЛА ФОРМАТУВАННЯ:
-    Поверни результат ВИКЛЮЧНО у форматі правильного JSON.
-    Значення для "status" може бути лише "OK" або "VIOLATION".
-
-    ШАБЛОН JSON:
+    ВАЖЛИВО: Поверни ТІЛЬКИ чистий JSON. Жодних вступних слів.
     {
       "sanitary": {
-         "status": "VIOLATION",
+         "status": "VIOLATION" (або "OK"),
          "verdict_title": "Короткий вердикт",
-         "details": "Опис порушень з посиланням на закон, або підтвердження норми."
+         "details": "Опис порушень."
       },
       "marketing": {
-         "advice": "Твої поради щодо покращення викладки для збільшення продажів (використовуй списки)."
+         "advice": "Поради з викладки."
       }
     }`;
 
@@ -98,13 +90,16 @@ async function sendImageToGemini(base64Image) {
         if (!response.ok) throw new Error("Помилка API");
 
         const data = await response.json();
-        let resultText = data.candidates[0].content.parts[0].text.trim();
+        let rawText = data.candidates[0].content.parts[0].text;
         
-        if (resultText.startsWith("```")) {
-            resultText = resultText.replace(/^```json/, "").replace(/```$/, "").trim();
+        // БРОНЕБІЙНИЙ ФІЛЬТР JSON: шукаємо від першої { до останньої }
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        
+        if (!jsonMatch) {
+            throw new Error("ШІ не повернув JSON формат.");
         }
 
-        const parsedData = JSON.parse(resultText);
+        const parsedData = JSON.parse(jsonMatch[0]);
 
         statusText.innerText = "Аудит завершено";
         statusText.style.color = "#2ecc71";
@@ -124,7 +119,7 @@ async function sendImageToGemini(base64Image) {
         btnGroup.style.display = 'flex';
 
     } catch (error) {
-        console.error("Помилка парсингу або API:", error);
+        console.error("Деталі помилки:", error);
         statusText.innerText = "Помилка аналізу!";
         statusText.style.color = "#e74c3c";
         alert("ШІ повернув некоректну відповідь. Спробуйте ще раз.");
