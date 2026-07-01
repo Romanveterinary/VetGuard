@@ -21,36 +21,35 @@
         
         .header-bar { display: flex; justify-content: space-between; pointer-events: auto; width: 100%; }
         .back-btn { padding: 8px 12px; background: rgba(44, 62, 80, 0.7); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .status-badge { background: rgba(0,0,0,0.6); color: #3498db; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: bold; }
+        .status-badge { background: rgba(0,0,0,0.6); color: #9b59b6; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: bold; }
         
-        /* Рамка сканера по центру */
-        .scanner-frame {
-            position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%);
-            width: 80%; height: 40%;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 15px; box-shadow: 0 0 0 4000px rgba(0,0,0,0.5); /* Затемнення навколо рамки */
-            pointer-events: none; z-index: 5;
+        /* Рамка для прицілу етикетки */
+        .scan-frame {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80%; height: 40%; border: 2px dashed rgba(155, 89, 182, 0.7);
+            border-radius: 15px; pointer-events: none; z-index: 5;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
         }
-        /* Куточки для краси */
-        .scanner-frame::before, .scanner-frame::after { content: ''; position: absolute; width: 30px; height: 30px; border-color: #3498db; border-style: solid; }
-        .scanner-frame::before { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 15px; }
-        .scanner-frame::after { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 15px; }
 
-        .controls-area { display: flex; flex-direction: column; align-items: center; pointer-events: auto; gap: 10px; width: 100%; z-index: 15;}
+        .controls-area { display: flex; flex-direction: column; align-items: center; pointer-events: auto; gap: 10px; width: 100%; z-index: 20;}
         
-        /* Панель результатів з прокруткою (бо тексту може бути багато) */
         .result-panel { 
-            display: none; background: rgba(0,0,0,0.85); color: #fff; 
-            padding: 20px; border-radius: 15px; text-align: left; 
-            border: 1px solid #3498db; width: 90%; max-width: 400px;
-            max-height: 50vh; overflow-y: auto; font-size: 14px; line-height: 1.5;
+            display: none; background: rgba(0,0,0,0.95); color: #fff; 
+            padding: 15px; border-radius: 15px; text-align: left; 
+            border: 1px solid #9b59b6; width: 90%; max-width: 400px;
+            max-height: 60vh; overflow-y: auto; font-size: 14px; line-height: 1.4;
         }
-        .result-panel h3 { margin: 0 0 10px 0; color: #f39c12; font-size: 18px; text-align: center;}
-        .result-panel .verdict { font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 10px; padding: 10px; border-radius: 8px;}
-        .verdict.ok { background: rgba(39, 174, 96, 0.3); color: #2ecc71; border: 1px solid #2ecc71; }
-        .verdict.warn { background: rgba(231, 76, 60, 0.3); color: #e74c3c; border: 1px solid #e74c3c; }
+        
+        .verdict { padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px; font-size: 16px; }
+        .verdict.ok { background: rgba(46, 204, 113, 0.3); border: 1px solid #2ecc71; color: #2ecc71; }
+        .verdict.warn { background: rgba(231, 76, 60, 0.3); border: 1px solid #e74c3c; color: #e74c3c; }
+        
+        .section-title { font-size: 15px; font-weight: bold; margin: 10px 0 5px 0; color: #9b59b6; }
+        .content-box { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 5px; }
 
-        .capture-btn { background: #3498db; color: white; border: none; padding: 18px 30px; border-radius: 25px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 90%; max-width: 400px; }
+        .action-buttons-group { display: flex; gap: 10px; width: 90%; max-width: 400px; }
+        .capture-btn { flex: 2; background: #9b59b6; color: white; border: none; padding: 18px; border-radius: 20px; font-size: 1.1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .gallery-btn { flex: 1; background: #34495e; color: white; border: none; padding: 18px; border-radius: 20px; font-size: 1.1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         
         .btn-group { display: flex; gap: 10px; width: 90%; max-width: 400px; display: none; }
         .btn-group button { flex: 1; padding: 15px; border: none; border-radius: 15px; font-weight: bold; color: white; cursor: pointer;}
@@ -63,22 +62,31 @@
     <div id="camera-container">
         <video id="video" autoplay playsinline muted></video>
         <canvas id="canvas"></canvas>
-        <div class="scanner-frame" id="scanner-frame"></div>
-        
+        <div class="scan-frame" id="scan-frame"></div>
+
         <div class="ui-layer">
             <div class="header-bar">
                 <button class="back-btn" onclick="window.location.href='index.html'">← Меню</button>
-                <div class="status-badge" id="status-text">Наведіть на текст</div>
+                <div class="status-badge" id="status-text">Наведіть на склад або штрихкод</div>
             </div>
             
             <div class="controls-area">
                 <div class="result-panel" id="result-panel">
-                    <h3>Результат Аналізу</h3>
-                    <div id="verdict-box" class="verdict ok">✅ Все в нормі</div>
-                    <div id="analysis-text">Тут буде детальний розбір складу та термінів...</div>
+                    <div id="verdict-box" class="verdict">Аналіз...</div>
+                    
+                    <div class="section-title">🧪 Аналіз інгредієнтів:</div>
+                    <div class="content-box" id="ingredients-text">...</div>
+                    
+                    <div class="section-title">🏷️ Маркування та дати:</div>
+                    <div class="content-box" id="marking-text">...</div>
                 </div>
                 
-                <button class="capture-btn" id="btn-capture">🔍 Сканувати етикетку</button>
+                <input type="file" id="gallery-input" accept="image/*" style="display: none;">
+                
+                <div class="action-buttons-group" id="action-buttons-group">
+                    <button class="capture-btn" id="btn-capture">📸 Сканувати</button>
+                    <button class="gallery-btn" id="btn-gallery">🖼️ Галерея</button>
+                </div>
                 
                 <div class="btn-group" id="btn-group">
                     <button id="btn-retry">Нове фото</button>
@@ -89,6 +97,5 @@
     </div>
 
     <script src="js/modules/ai-scanner.js"></script>
-
 </body>
 </html>
