@@ -16,7 +16,7 @@ const sanitaryText = document.getElementById('sanitary-text');
 const marketingText = document.getElementById('marketing-text');
 
 let isVideoPlaying = false;
-let lastCapturedImage = ""; // Змінна для зберігання фотографії для звіту
+let lastCapturedImage = ""; 
 
 async function setupCamera() {
     try {
@@ -51,18 +51,20 @@ async function sendImageToGemini(base64Image) {
     statusText.innerText = "Аналізую вітрину...";
     statusText.style.color = "#f1c40f";
 
+    // Оновлений чистий шаблон JSON
     const promptText = `Проаналізуй цю вітрину.
     РОЛЬ 1: САНІТАРНИЙ ІНСПЕКТОР (Україна)
     Шукай фактичні порушення: Наказ №185 п.16 (Товарне сусідство сирого і готового), Закон №771 ст.49 (Гігієна: бруд, відсутність екранів). 
     Якщо є бруд або пошкодження - вимагай генеральне прибирання або ремонт.
     
     РОЛЬ 2: МЕРЧАНДАЙЗЕР
-    Дай 2-3 поради, як переставити товари для збільшення продажів (колір, правило золотої полиці).
+    Дай 2-3 поради, як переставити товари для збільшення продажів.
 
-    ВАЖЛИВО: Поверни ТІЛЬКИ чистий JSON. Жодних вступних слів.
+    ВАЖЛИВО: Поверни ТІЛЬКИ чистий JSON. 
+    ШАБЛОН:
     {
       "sanitary": {
-         "status": "VIOLATION" (або "OK"),
+         "status": "VIOLATION",
          "verdict_title": "Короткий вердикт",
          "details": "Опис порушень."
       },
@@ -71,6 +73,7 @@ async function sendImageToGemini(base64Image) {
       }
     }`;
 
+    // Додано safetySettings, щоб ШІ не блокував фото сирого м'яса!
     const requestBody = {
         contents: [{
             parts: [
@@ -78,7 +81,13 @@ async function sendImageToGemini(base64Image) {
                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
             ]
         }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+        generationConfig: { responseMimeType: "application/json", temperature: 0.1 },
+        safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ]
     };
 
     try {
@@ -88,16 +97,19 @@ async function sendImageToGemini(base64Image) {
             body: JSON.stringify(requestBody)
         });
 
-        if (!response.ok) throw new Error("Помилка API");
+        if (!response.ok) throw new Error("Помилка з'єднання з API");
 
         const data = await response.json();
-        let rawText = data.candidates[0].content.parts[0].text;
         
+        // Перевірка, чи не заблокував нас фільтр
+        if (!data.candidates || data.candidates.length === 0) {
+            throw new Error("Відповідь заблоковано фільтром безпеки Google.");
+        }
+
+        let rawText = data.candidates[0].content.parts[0].text;
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         
-        if (!jsonMatch) {
-            throw new Error("ШІ не повернув JSON формат.");
-        }
+        if (!jsonMatch) throw new Error("ШІ не повернув JSON формат.");
 
         const parsedData = JSON.parse(jsonMatch[0]);
 
@@ -122,7 +134,7 @@ async function sendImageToGemini(base64Image) {
         console.error("Деталі помилки:", error);
         statusText.innerText = "Помилка аналізу!";
         statusText.style.color = "#e74c3c";
-        alert("ШІ повернув некоректну відповідь. Спробуйте ще раз.");
+        alert("Помилка (можливо фото заблоковано фільтром Google). Спробуйте ще раз.");
         resetScanner();
     }
 }
@@ -139,7 +151,7 @@ btnCapture.addEventListener('click', () => {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
         
-        lastCapturedImage = base64Image; // Зберігаємо для HTML звіту
+        lastCapturedImage = base64Image;
         sendImageToGemini(base64Image);
     }
 });
@@ -170,7 +182,7 @@ galleryInput.addEventListener('change', (e) => {
             video.style.display = 'none';
             
             const base64Image = event.target.result.split(',')[1];
-            lastCapturedImage = base64Image; // Зберігаємо для HTML звіту
+            lastCapturedImage = base64Image;
             sendImageToGemini(base64Image);
         };
         img.src = event.target.result;
@@ -197,7 +209,7 @@ function resetScanner() {
 
 btnRetry.addEventListener('click', resetScanner);
 
-// НОВА ФУНКЦІЯ: ЗБЕРЕЖЕННЯ ЗВІТУ ЯК HTML ДОКУМЕНТ
+// ВИПРАВЛЕНО: Примусове збереження HTML для мобільних
 btnSave.addEventListener('click', () => {
     if (!lastCapturedImage) {
         alert("Помилка: немає фотографії для звіту.");
@@ -213,7 +225,6 @@ btnSave.addEventListener('click', () => {
     const verdictBg = isWarn ? '#fadbd8' : '#d4efdf';
     const verdictBorder = isWarn ? '#e74c3c' : '#2ecc71';
 
-    // Формуємо красивий HTML-шаблон звіту
     const htmlContent = `
     <!DOCTYPE html>
     <html lang="uk">
@@ -270,19 +281,19 @@ btnSave.addEventListener('click', () => {
     </html>
     `;
 
-    // Створюємо Blob з HTML кодом
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `VetGuard_Audit_${fileNameDate}.html`;
     
-    // Імітуємо клік для старту завантаження
+    // ДОДАНО ДЛЯ МОБІЛЬНИХ БРАУЗЕРІВ: примусове додавання посилання в документ перед кліком
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
     
-    // Очищаємо пам'ять
     setTimeout(() => URL.revokeObjectURL(link.href), 100);
     
-    alert("HTML звіт успішно завантажено на ваш пристрій!");
+    alert("HTML звіт успішно збережено! Шукайте його у папці 'Завантаження' (Downloads) на вашому телефоні.");
     resetScanner();
 });
 
