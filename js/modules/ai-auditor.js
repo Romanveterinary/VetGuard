@@ -51,7 +51,6 @@ async function sendImageToGemini(base64Image) {
     statusText.innerText = "Аналізую вітрину...";
     statusText.style.color = "#f1c40f";
 
-    // Оновлений чистий шаблон JSON
     const promptText = `Проаналізуй цю вітрину.
     РОЛЬ 1: САНІТАРНИЙ ІНСПЕКТОР (Україна)
     Шукай фактичні порушення: Наказ №185 п.16 (Товарне сусідство сирого і готового), Закон №771 ст.49 (Гігієна: бруд, відсутність екранів). 
@@ -73,7 +72,6 @@ async function sendImageToGemini(base64Image) {
       }
     }`;
 
-    // Додано safetySettings, щоб ШІ не блокував фото сирого м'яса!
     const requestBody = {
         contents: [{
             parts: [
@@ -101,7 +99,6 @@ async function sendImageToGemini(base64Image) {
 
         const data = await response.json();
         
-        // Перевірка, чи не заблокував нас фільтр
         if (!data.candidates || data.candidates.length === 0) {
             throw new Error("Відповідь заблоковано фільтром безпеки Google.");
         }
@@ -134,12 +131,11 @@ async function sendImageToGemini(base64Image) {
         console.error("Деталі помилки:", error);
         statusText.innerText = "Помилка аналізу!";
         statusText.style.color = "#e74c3c";
-        alert("Помилка (можливо фото заблоковано фільтром Google). Спробуйте ще раз.");
+        alert("Помилка аналізу. Спробуйте ще раз.");
         resetScanner();
     }
 }
 
-// Клік по кнопці Фото
 btnCapture.addEventListener('click', () => {
     if (isVideoPlaying) {
         video.pause();
@@ -156,12 +152,10 @@ btnCapture.addEventListener('click', () => {
     }
 });
 
-// Клік по кнопці Галерея
 btnGallery.addEventListener('click', () => {
     galleryInput.click();
 });
 
-// Обробка обраного файлу
 galleryInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -209,7 +203,7 @@ function resetScanner() {
 
 btnRetry.addEventListener('click', resetScanner);
 
-// ВИПРАВЛЕНО: Примусове збереження HTML для мобільних
+// РОЗУМНА ФУНКЦІЯ ЗБЕРЕЖЕННЯ: КОРЕКТНО ПРАЦЮЄ НА IPHONE ТА ANDROID
 btnSave.addEventListener('click', () => {
     if (!lastCapturedImage) {
         alert("Помилка: немає фотографії для звіту.");
@@ -254,47 +248,57 @@ btnSave.addEventListener('click', () => {
                 <h1>VetGuard Pro: Офіційний Аудит</h1>
                 <div class="date">Дата та час перевірки: <b>${dateString}</b></div>
             </div>
-            
             <div class="photo-box">
                 <img src="data:image/jpeg;base64,${lastCapturedImage}" alt="Фото вітрини">
             </div>
-            
             <div class="verdict">
                 ${verdictBox.innerHTML}
             </div>
-
             <div class="section sanitary">
                 <h2>Санітарна експертиза</h2>
                 <div>${sanitaryText.innerHTML}</div>
             </div>
-
             <div class="section marketing">
                 <h2>Комерційні рекомендації</h2>
                 <div>${marketingText.innerHTML}</div>
             </div>
-
             <div class="footer">
-                Згенеровано автоматично системою штучного інтелекту VetGuard Pro
+                Згенеровано автоматично системою VetGuard Pro
             </div>
         </div>
     </body>
     </html>
     `;
 
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `VetGuard_Audit_${fileNameDate}.html`;
-    
-    // ДОДАНО ДЛЯ МОБІЛЬНИХ БРАУЗЕРІВ: примусове додавання посилання в документ перед кліком
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    setTimeout(() => URL.revokeObjectURL(link.href), 100);
-    
-    alert("HTML звіт успішно збережено! Шукайте його у папці 'Завантаження' (Downloads) на вашому телефоні.");
-    resetScanner();
+    // Розпізнаємо, чи це пристрій компанії Apple
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isIOS) {
+        // Логіка для АЙФОНА: Відкриваємо звіт у новій вкладці
+        const newWindow = window.open();
+        if (newWindow) {
+            newWindow.document.write(htmlContent);
+            newWindow.document.close();
+            alert("Звіт відкрито у новій вкладці! Ви можете скопіювати текст або натиснути кнопку 'Поділитися' -> 'Друкувати' внизу екрана, щоб зберегти звіт як PDF.");
+        } else {
+            alert("Браузер заблокував нове вікно. Будь ласка, дозвольте спливаючі вікна для цього сайту в налаштуваннях Safari.");
+        }
+        resetScanner();
+    } else {
+        // Логіка для АНДРОЇД / ПК: Пряме завантаження файлу
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `VetGuard_Audit_${fileNameDate}.html`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setTimeout(() => URL.revokeObjectURL(link.href), 100);
+        alert("Звіт успішно збережено у папку 'Завантаження'!");
+        resetScanner();
+    }
 });
 
 init();
