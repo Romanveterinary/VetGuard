@@ -194,6 +194,50 @@ function resetScanner() {
 }
 
 btnRetry.addEventListener('click', resetScanner);
-btnSave.addEventListener('click', () => { alert("Аудит успішно збережено!"); resetScanner(); });
+
+// НОВА ФУНКЦІЯ: РЕАЛЬНЕ ЗБЕРЕЖЕННЯ ЗВІТУ ЯК КАРТИНКИ
+btnSave.addEventListener('click', async () => {
+    // 1. Тимчасово ховаємо верхню панель і кнопки
+    const headerBar = document.querySelector('.header-bar');
+    if (headerBar) headerBar.style.display = 'none';
+    btnGroup.style.display = 'none';
+    
+    statusText.innerText = "Генерація звіту...";
+    
+    try {
+        // Перевіряємо наявність бібліотеки
+        if (typeof html2canvas === 'undefined') {
+            throw new Error("Бібліотека html2canvas не знайдена. Додайте скрипт у HTML.");
+        }
+
+        // 2. Створюємо скріншот зони камери з панеллю
+        const captureArea = document.getElementById('camera-container');
+        const canvasScreenshot = await html2canvas(captureArea, {
+            useCORS: true, 
+            scale: 2, // Подвійна якість
+            backgroundColor: "#000000"
+        });
+
+        // 3. Формуємо файл та скачуємо його
+        const image = canvasScreenshot.toDataURL("image/jpeg", 0.9);
+        const link = document.createElement('a');
+        link.href = image;
+        
+        const now = new Date();
+        const dateString = `${now.getDate()}-${now.getMonth()+1}-${now.getFullYear()}_${now.getHours()}-${now.getMinutes()}`;
+        link.download = `VetGuard_Audit_${dateString}.jpg`;
+        
+        link.click();
+        alert("Звіт успішно збережено в Завантаження!");
+
+    } catch (error) {
+        console.error("Помилка генерації звіту:", error);
+        alert("Помилка збереження. Переконайтеся, що ви додали скрипт html2canvas у файл ai-auditor.html");
+    } finally {
+        // 4. Повертаємо все як було
+        if (headerBar) headerBar.style.display = 'flex';
+        resetScanner();
+    }
+});
 
 init();
