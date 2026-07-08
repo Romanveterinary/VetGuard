@@ -16,6 +16,7 @@ const sanitaryText = document.getElementById('sanitary-text');
 const marketingText = document.getElementById('marketing-text');
 
 let isVideoPlaying = false;
+let lastCapturedImage = ""; // Змінна для зберігання фотографії для звіту
 
 async function setupCamera() {
     try {
@@ -92,7 +93,6 @@ async function sendImageToGemini(base64Image) {
         const data = await response.json();
         let rawText = data.candidates[0].content.parts[0].text;
         
-        // БРОНЕБІЙНИЙ ФІЛЬТР JSON: шукаємо від першої { до останньої }
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         
         if (!jsonMatch) {
@@ -139,6 +139,7 @@ btnCapture.addEventListener('click', () => {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
         
+        lastCapturedImage = base64Image; // Зберігаємо для HTML звіту
         sendImageToGemini(base64Image);
     }
 });
@@ -169,6 +170,7 @@ galleryInput.addEventListener('change', (e) => {
             video.style.display = 'none';
             
             const base64Image = event.target.result.split(',')[1];
+            lastCapturedImage = base64Image; // Зберігаємо для HTML звіту
             sendImageToGemini(base64Image);
         };
         img.src = event.target.result;
@@ -195,49 +197,93 @@ function resetScanner() {
 
 btnRetry.addEventListener('click', resetScanner);
 
-// НОВА ФУНКЦІЯ: РЕАЛЬНЕ ЗБЕРЕЖЕННЯ ЗВІТУ ЯК КАРТИНКИ
-btnSave.addEventListener('click', async () => {
-    // 1. Тимчасово ховаємо верхню панель і кнопки
-    const headerBar = document.querySelector('.header-bar');
-    if (headerBar) headerBar.style.display = 'none';
-    btnGroup.style.display = 'none';
-    
-    statusText.innerText = "Генерація звіту...";
-    
-    try {
-        // Перевіряємо наявність бібліотеки
-        if (typeof html2canvas === 'undefined') {
-            throw new Error("Бібліотека html2canvas не знайдена. Додайте скрипт у HTML.");
-        }
-
-        // 2. Створюємо скріншот зони камери з панеллю
-        const captureArea = document.getElementById('camera-container');
-        const canvasScreenshot = await html2canvas(captureArea, {
-            useCORS: true, 
-            scale: 2, // Подвійна якість
-            backgroundColor: "#000000"
-        });
-
-        // 3. Формуємо файл та скачуємо його
-        const image = canvasScreenshot.toDataURL("image/jpeg", 0.9);
-        const link = document.createElement('a');
-        link.href = image;
-        
-        const now = new Date();
-        const dateString = `${now.getDate()}-${now.getMonth()+1}-${now.getFullYear()}_${now.getHours()}-${now.getMinutes()}`;
-        link.download = `VetGuard_Audit_${dateString}.jpg`;
-        
-        link.click();
-        alert("Звіт успішно збережено в Завантаження!");
-
-    } catch (error) {
-        console.error("Помилка генерації звіту:", error);
-        alert("Помилка збереження. Переконайтеся, що ви додали скрипт html2canvas у файл ai-auditor.html");
-    } finally {
-        // 4. Повертаємо все як було
-        if (headerBar) headerBar.style.display = 'flex';
-        resetScanner();
+// НОВА ФУНКЦІЯ: ЗБЕРЕЖЕННЯ ЗВІТУ ЯК HTML ДОКУМЕНТ
+btnSave.addEventListener('click', () => {
+    if (!lastCapturedImage) {
+        alert("Помилка: немає фотографії для звіту.");
+        return;
     }
+
+    const now = new Date();
+    const dateString = `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getFullYear()} ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const fileNameDate = `${now.getDate()}-${now.getMonth()+1}-${now.getFullYear()}_${now.getHours()}-${now.getMinutes()}`;
+
+    const isWarn = verdictBox.className.includes('warn');
+    const verdictColor = isWarn ? '#c0392b' : '#27ae60';
+    const verdictBg = isWarn ? '#fadbd8' : '#d4efdf';
+    const verdictBorder = isWarn ? '#e74c3c' : '#2ecc71';
+
+    // Формуємо красивий HTML-шаблон звіту
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="uk">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Звіт Аудиту | VetGuard Pro</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f8; color: #2c3e50; padding: 20px; line-height: 1.6; }
+            .container { max-width: 700px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+            .header { text-align: center; border-bottom: 2px solid #f39c12; padding-bottom: 15px; margin-bottom: 25px; }
+            .header h1 { margin: 0; color: #2c3e50; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+            .date { color: #7f8c8d; font-size: 14px; margin-top: 5px; }
+            .photo-box { text-align: center; margin-bottom: 25px; }
+            .photo-box img { max-width: 100%; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+            .verdict { font-size: 18px; font-weight: bold; text-align: center; padding: 15px; border-radius: 8px; margin-bottom: 25px; background: ${verdictBg}; color: ${verdictColor}; border: 1px solid ${verdictBorder}; }
+            .section { background: #fafafa; padding: 20px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 20px; }
+            .section h2 { margin-top: 0; font-size: 18px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+            .sanitary h2 { color: #e74c3c; }
+            .marketing h2 { color: #f39c12; }
+            .footer { text-align: center; font-size: 12px; color: #95a5a6; margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>VetGuard Pro: Офіційний Аудит</h1>
+                <div class="date">Дата та час перевірки: <b>${dateString}</b></div>
+            </div>
+            
+            <div class="photo-box">
+                <img src="data:image/jpeg;base64,${lastCapturedImage}" alt="Фото вітрини">
+            </div>
+            
+            <div class="verdict">
+                ${verdictBox.innerHTML}
+            </div>
+
+            <div class="section sanitary">
+                <h2>Санітарна експертиза</h2>
+                <div>${sanitaryText.innerHTML}</div>
+            </div>
+
+            <div class="section marketing">
+                <h2>Комерційні рекомендації</h2>
+                <div>${marketingText.innerHTML}</div>
+            </div>
+
+            <div class="footer">
+                Згенеровано автоматично системою штучного інтелекту VetGuard Pro
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    // Створюємо Blob з HTML кодом
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `VetGuard_Audit_${fileNameDate}.html`;
+    
+    // Імітуємо клік для старту завантаження
+    link.click();
+    
+    // Очищаємо пам'ять
+    setTimeout(() => URL.revokeObjectURL(link.href), 100);
+    
+    alert("HTML звіт успішно завантажено на ваш пристрій!");
+    resetScanner();
 });
 
 init();
