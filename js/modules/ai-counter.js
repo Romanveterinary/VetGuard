@@ -3,6 +3,7 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const btnCapture = document.getElementById('btn-capture');
 const btnGeminiCount = document.getElementById('btn-gemini-count');
+const btnSettings = document.getElementById('btn-settings');
 const crosshair = document.getElementById('crosshair');
 const statusText = document.getElementById('status-text');
 const resultPanel = document.getElementById('result-panel');
@@ -12,7 +13,6 @@ const slidersBox = document.getElementById('sliders-box');
 const geminiResultPanel = document.getElementById('gemini-result-panel');
 const geminiCountSpan = document.getElementById('gemini-count');
 
-// Елементи повзунків
 const threshSlider = document.getElementById('thresh-slider');
 const threshVal = document.getElementById('thresh-val');
 const calibSlider = document.getElementById('calib-slider');
@@ -21,8 +21,8 @@ const calibVal = document.getElementById('calib-val');
 let model = null;
 let isVideoPlaying = false;
 let rawPredictions = []; 
+let settingsTimeout; 
 
-// Словник цільових класів (тільки тварини)
 const animalClasses = ['bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'bear', 'zebra', 'giraffe', 'elephant'];
 
 async function setupCamera() {
@@ -31,7 +31,7 @@ async function setupCamera() {
         video.srcObject = stream;
         return new Promise((resolve) => { video.onloadedmetadata = () => resolve(video); });
     } catch (error) {
-        statusText.innerText = "Помилка камери!";
+        statusText.innerText = "Помилка камери";
     }
 }
 
@@ -41,7 +41,7 @@ async function loadModel() {
         statusText.innerText = "Аналізатор готовий";
         btnCapture.style.display = "block";
     } catch (error) {
-        statusText.innerText = "Помилка завантаження!";
+        statusText.innerText = "Помилка завантаження";
     }
 }
 
@@ -54,61 +54,102 @@ async function init() {
     await loadModel();
 }
 
+// Алгоритм NMS (Intersection over Union)
+function calculateIoU(box1, box2) {
+    const [x1, y1, w1, h1] = box1;
+    const [x2, y2, w2, h2] = box2;
+
+    const xA = Math.max(x1, x2);
+    const yA = Math.max(y1, y2);
+    const xB = Math.min(x1 + w1, x2 + w2);
+    const yB = Math.min(y1 + h1, y2 + h2);
+
+    const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
+    const box1Area = w1 * h1;
+    const box2Area = w2 * h2;
+    const unionArea = box1Area + box2Area - interArea;
+
+    return interArea / unionArea;
+}
+
 function processAndDraw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    let count = 0;
     const threshold = parseInt(threshSlider.value, 10) / 100;
-    const calibFactor = parseInt(calibSlider.value, 10);
 
     const scaleX = canvas.width / video.videoWidth;
     const scaleY = canvas.height / video.videoHeight;
 
-    rawPredictions.forEach(pred => {
-        // Фільтр: Тільки достатня точність І ТІЛЬКИ ТВАРИНИ
-        if (pred.score >= threshold && animalClasses.includes(pred.class)) {
-            count++;
-            const [x, y, width, height] = pred.bbox;
-            
-            const sX = x * scaleX;
-            const sY = y * scaleY;
-            const sW = width * scaleX;
-            const sH = height * scaleY;
+    let filtered = rawPredictions.filter(pred => pred.score >= threshold && animalClasses.includes(pred.class));
+    filtered.sort((a, b) => b.score - a.score);
 
-            const objectSizeOnScreen = Math.max(width, height);
-            const estimatedDistance = calibFactor / objectSizeOnScreen;
+    const finalPredictions = [];
+    const iouThreshold = 0.3; // Відсікання дублікатів (перекриття > 30%)
 
-            ctx.strokeStyle = '#3498db';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(sX, sY, sW, sH);
-
-            const centerX = sX + sW / 2;
-            const centerY = sY + sH / 2;
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, 6, 0, 2 * Math.PI);
-            ctx.fillStyle = '#2ecc71';
-            ctx.fill();
-            ctx.lineWidth = 1.5;
-            ctx.strokeStyle = '#ffffff';
-            ctx.stroke();
-
-            ctx.fillStyle = '#3498db';
-            ctx.font = 'bold 12px Arial';
-            ctx.fillText(`Тварина ~${estimatedDistance.toFixed(1)}м`, sX + 4, sY - 6);
+    for (let i = 0; i < filtered.length; i++) {
+        let keep = true;
+        for (let j = 0; j < finalPredictions.length; j++) {
+            if (calculateIoU(filtered[i].bbox, finalPredictions[j].bbox) > iouThreshold) {
+                keep = false;
+                break;
+            }
         }
+        if (keep) finalPredictions.push(filtered[i]);
+    }
+
+    let count = 0;
+
+    finalPredictions.forEach(pred => {
+        count++;
+        const [x, y, width, height] = pred.bbox;
+        
+        const sX = x * scaleX;
+        const sY = y * scaleY;
+        const sW = width * scaleX;
+        const sH = height * scaleY;
+
+        ctx.strokeStyle = '#3498db';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(sX, sY, sW, sH);
+
+        const centerX = sX + sW / 2;
+        const centerY = sY + sH / 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = '#2ecc71';
+        ctx.fill();
     });
 
     objectCountSpan.innerText = count;
 }
 
+// Логіка інтерфейсу
+function resetSettingsTimer() {
+    clearTimeout(settingsTimeout);
+    slidersBox.classList.add('active');
+    settingsTimeout = setTimeout(() => {
+        slidersBox.classList.remove('active');
+    }, 5000);
+}
+
+btnSettings.addEventListener('click', () => {
+    if (slidersBox.classList.contains('active')) {
+        slidersBox.classList.remove('active');
+        clearTimeout(settingsTimeout);
+    } else {
+        resetSettingsTimer();
+    }
+});
+
 threshSlider.addEventListener('input', (e) => {
     threshVal.innerText = e.target.value;
-    processAndDraw();
+    resetSettingsTimer();
+    if (!isVideoPlaying) processAndDraw();
 });
 
 calibSlider.addEventListener('input', (e) => {
     calibVal.innerText = e.target.value;
-    processAndDraw();
+    resetSettingsTimer();
 });
 
 async function toggleCapture() {
@@ -118,7 +159,7 @@ async function toggleCapture() {
         video.pause();
         isVideoPlaying = false;
         btnCapture.innerText = "🔄 Очистити кадр";
-        statusText.innerText = "Обробка геометрії...";
+        statusText.innerText = "Аналіз геометрії";
         crosshair.style.display = 'none';
 
         canvas.width = video.clientWidth;
@@ -126,9 +167,9 @@ async function toggleCapture() {
 
         rawPredictions = await model.detect(video);
 
-        slidersBox.style.display = 'block';
+        btnSettings.style.display = 'block';
         resultPanel.style.display = 'block';
-        btnGeminiCount.style.display = 'block'; // Показуємо кнопку ШІ
+        btnGeminiCount.style.display = 'block'; 
         
         statusText.innerText = "Кадр зафіксовано";
         processAndDraw(); 
@@ -139,7 +180,9 @@ async function toggleCapture() {
         statusText.innerText = "Аналізатор готовий";
         crosshair.style.display = 'block';
         
-        slidersBox.style.display = 'none';
+        btnSettings.style.display = 'none';
+        slidersBox.classList.remove('active');
+        clearTimeout(settingsTimeout);
         resultPanel.style.display = 'none';
         btnGeminiCount.style.display = 'none';
         geminiResultPanel.style.display = 'none';
@@ -149,11 +192,10 @@ async function toggleCapture() {
     }
 }
 
-// Функція підрахунку щільного натовпу через Gemini API
 btnGeminiCount.addEventListener('click', async () => {
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
-        alert("Введіть ваш Gemini API ключ у налаштуваннях.");
+        alert("API ключ відсутній.");
         return;
     }
 
@@ -162,7 +204,6 @@ btnGeminiCount.addEventListener('click', async () => {
     statusText.innerText = "Відправка до ШІ...";
 
     try {
-        // Створюємо чисте зображення відео без синіх квадратів
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = video.videoWidth;
         tempCanvas.height = video.videoHeight;
@@ -170,7 +211,7 @@ btnGeminiCount.addEventListener('click', async () => {
         tCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
         const base64Image = tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-        const promptText = "Ти експерт-ветеринар. Уважно порахуй ВСІХ тварин (свиней, корів, овець, птицю тощо) на цьому фото. Тварини можуть стояти дуже щільно. Поверни ТІЛЬКИ одне число (наприклад: 12). Нічого більше не пиши.";
+        const promptText = "Порахуй кількість тварин (свиней, корів, овець тощо) на цьому фото. Поверни ТІЛЬКИ одне число.";
 
         const requestBody = {
             contents: [{
@@ -188,18 +229,16 @@ btnGeminiCount.addEventListener('click', async () => {
             body: JSON.stringify(requestBody)
         });
 
-        if (!response.ok) throw new Error("Помилка API");
+        if (!response.ok) throw new Error("API fail");
 
         const data = await response.json();
         const resultText = data.candidates[0].content.parts[0].text.trim();
         
-        // Витягуємо тільки числа з відповіді
         const numbersOnly = resultText.replace(/\D/g, '');
         geminiCountSpan.innerText = numbersOnly || "0";
-        statusText.innerText = "ШІ завершив підрахунок";
+        statusText.innerText = "ШІ завершив";
 
     } catch (error) {
-        console.error(error);
         geminiCountSpan.innerText = "Помилка";
         statusText.innerText = "Збій з'єднання";
     }
