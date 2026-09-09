@@ -208,13 +208,36 @@ btnGeminiCount.addEventListener('click', async () => {
     geminiCountSpan.innerText = "рахую...";
     statusText.innerText = "Відправка до ШІ...";
 
+    // Ініціалізація таймауту на 15 секунд
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
+        // Жорстке пропорційне стиснення зображення (макс. сторона 800px)
+        const MAX_SIZE = 800;
+        let width = video.videoWidth;
+        let height = video.videoHeight;
+
+        if (width > height) {
+            if (width > MAX_SIZE) {
+                height = Math.round(height *= MAX_SIZE / width);
+                width = MAX_SIZE;
+            }
+        } else {
+            if (height > MAX_SIZE) {
+                width = Math.round(width *= MAX_SIZE / height);
+                height = MAX_SIZE;
+            }
+        }
+
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = video.videoWidth;
-        tempCanvas.height = video.videoHeight;
+        tempCanvas.width = width;
+        tempCanvas.height = height;
         const tCtx = tempCanvas.getContext('2d');
-        tCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
-        const base64Image = tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+        tCtx.drawImage(video, 0, 0, width, height);
+        
+        // Зниження якості JPEG до 70% для зменшення ваги
+        const base64Image = tempCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
 
         const target = targetSelect.value;
         const promptText = `Контекст: Ветеринарний/фермерський огляд. Завдання: максимально точно порахуй цільові об'єкти на фотографії. Цільові об'єкти: ${target}. Поверни ТІЛЬКИ одне число. Жодних інших слів.`;
@@ -238,8 +261,11 @@ btnGeminiCount.addEventListener('click', async () => {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(requestBody),
+            signal: controller.signal // Прив'язка запиту до таймауту
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) throw new Error("API fail");
 
@@ -255,11 +281,18 @@ btnGeminiCount.addEventListener('click', async () => {
         statusText.innerText = "ШІ завершив";
 
     } catch (error) {
+        clearTimeout(timeoutId);
         console.error("Помилка підрахунку:", error);
-        geminiCountSpan.innerText = "Помилка";
-        statusText.innerText = "Збій підрахунку";
+        
+        // Розпізнавання типу помилки
+        if (error.name === 'AbortError') {
+            geminiCountSpan.innerText = "Таймаут";
+            statusText.innerText = "Мережа недоступна";
+        } else {
+            geminiCountSpan.innerText = "Помилка";
+            statusText.innerText = "Збій підрахунку";
+        }
     }
 });
-
 btnCapture.addEventListener('click', toggleCapture);
 init();
