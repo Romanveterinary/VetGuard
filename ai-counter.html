@@ -8,17 +8,15 @@
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         
-        /* Використовуємо 100dvh (динамічна висота) для обходу багів мобільних браузерів */
         #camera-container { position: relative; width: 100vw; height: 100vh; height: 100dvh; }
         video { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
         canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 2; pointer-events: none; }
         
-        /* Додано padding-bottom для захисту від системних кнопок Android/iOS */
         .ui-layer { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             z-index: 10; display: flex; flex-direction: column; justify-content: space-between; 
             padding: 15px; 
-            padding-bottom: max(35px, env(safe-area-inset-bottom)); /* ГАРАНТОВАНИЙ ВІДСТУП ЗНИЗУ */
+            padding-bottom: max(35px, env(safe-area-inset-bottom)); 
             box-sizing: border-box; pointer-events: none; 
         }
         
@@ -36,6 +34,10 @@
         .result-badge { display: none; background: rgba(44, 62, 80, 0.9); color: #fff; padding: 8px 20px; border-radius: 20px; font-size: 1.1rem; font-weight: bold; border: 1px solid #3498db; }
         .result-badge span { color: #3498db; font-size: 1.4rem; }
         
+        /* Нова панель для результату ШІ */
+        #gemini-result-panel { background: rgba(155, 89, 182, 0.9); border-color: #9b59b6; margin-top: -5px; }
+        #gemini-result-panel span { color: #fff; }
+
         .sliders-box { display: none; background: rgba(0,0,0,0.75); padding: 10px 15px; border-radius: 12px; width: 90%; max-width: 320px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1); }
         .slider-row { margin-bottom: 8px; text-align: left; }
         .slider-row:last-child { margin-bottom: 0; }
@@ -43,8 +45,10 @@
         .slider-row label span { color: #3498db; }
         .slider-row input[type=range] { width: 100%; accent-color: #3498db; margin: 0; }
 
-        /* Кнопка стала трохи вищою для зручності */
         .capture-btn { background: #3498db; color: white; border: none; padding: 18px 30px; border-radius: 25px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 90%; max-width: 320px; }
+        
+        /* Нова кнопка для ШІ */
+        #btn-gemini-count { background: #9b59b6; display: none; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -61,7 +65,8 @@
             </div>
             
             <div class="controls-area">
-                <div class="result-badge" id="result-panel">Знайдено фігур: <span id="object-count">0</span></div>
+                <div class="result-badge" id="result-panel">Офлайн пошук: <span id="object-count">0</span></div>
+                <div class="result-badge" id="gemini-result-panel">ШІ нарахував: <span id="gemini-count">...</span></div>
                 
                 <div class="sliders-box" id="sliders-box">
                     <div class="slider-row">
@@ -75,6 +80,7 @@
                 </div>
                 
                 <button class="capture-btn" id="btn-capture" style="display:none;">📸 Зафіксувати кадр</button>
+                <button class="capture-btn" id="btn-gemini-count">🤖 Точний ШІ-Підрахунок</button>
             </div>
         </div>
     </div>
