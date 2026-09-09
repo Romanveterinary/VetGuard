@@ -37,14 +37,12 @@
         #gemini-result-panel { background: rgba(155, 89, 182, 0.9); border-color: #9b59b6; margin-top: -5px; }
         #gemini-result-panel span { color: #fff; }
 
-        /* Кнопка налаштувань */
         #btn-settings { 
             background: rgba(44, 62, 80, 0.8); color: white; border: 1px solid #7f8c8d; 
             padding: 10px 20px; border-radius: 15px; font-size: 1rem; font-weight: bold; 
             cursor: pointer; display: none; 
         }
 
-        /* Оновлена висувна панель: плавне зникнення, висить поверх усього */
         .sliders-box { 
             position: absolute; bottom: 150px; background: rgba(0,0,0,0.85); 
             padding: 15px; border-radius: 12px; width: 90%; max-width: 320px; 
@@ -54,7 +52,6 @@
             z-index: 20; 
         }
         
-        /* Клас для активації панелі */
         .sliders-box.active {
             opacity: 1; visibility: visible; transform: translateY(0);
         }
@@ -64,6 +61,14 @@
         .slider-row label { display: flex; justify-content: space-between; color: #bdc3c7; font-size: 12px; font-weight: bold; margin-bottom: 10px; }
         .slider-row label span { color: #3498db; }
         .slider-row input[type=range] { width: 100%; accent-color: #3498db; margin: 0; }
+
+        /* Стилі для випадаючого списку */
+        .target-dropdown {
+            background: rgba(44, 62, 80, 0.9); color: white; border: 1px solid #9b59b6;
+            padding: 12px 15px; border-radius: 15px; font-size: 1rem; font-weight: bold;
+            width: 90%; max-width: 320px; display: none; margin-top: 5px; outline: none;
+            appearance: none; text-align: center; cursor: pointer;
+        }
 
         .capture-btn { background: #3498db; color: white; border: none; padding: 18px 30px; border-radius: 25px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); width: 90%; max-width: 320px; }
         
@@ -87,7 +92,6 @@
                 <div class="result-badge" id="result-panel">Офлайн пошук: <span id="object-count">0</span></div>
                 <div class="result-badge" id="gemini-result-panel">ШІ нарахував: <span id="gemini-count">...</span></div>
                 
-                <!-- Панель калібрування винесена сюди, щоб позиціонуватись відносно controls-area -->
                 <div class="sliders-box" id="sliders-box">
                     <div class="slider-row">
                         <label>Точність розпізнавання: <span id="thresh-val">50</span>%</label>
@@ -101,6 +105,17 @@
                 
                 <button id="btn-settings">⚙️ Налаштування</button>
                 <button class="capture-btn" id="btn-capture" style="display:none;">📸 Зафіксувати кадр</button>
+                
+                <!-- Новий елемент вибору цілі для ШІ -->
+                <select id="target-select" class="target-dropdown">
+                    <option value="найбільш масові об'єкти (ті, яких найбільше в кадрі)">Авто: найбільше в кадрі</option>
+                    <option value="свині">Свині</option>
+                    <option value="корови">Корови</option>
+                    <option value="вівці">Вівці</option>
+                    <option value="птиця (кури, качки, індики тощо)">Птиця</option>
+                    <option value="кролі">Кролі</option>
+                </select>
+
                 <button class="capture-btn" id="btn-gemini-count">🤖 Точний ШІ-Підрахунок</button>
             </div>
         </div>
