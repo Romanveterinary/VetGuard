@@ -192,6 +192,7 @@ async function toggleCapture() {
     }
 }
 
+// ОНОВЛЕНИЙ БЛОК ШІ-ЛІЧИЛЬНИКА
 btnGeminiCount.addEventListener('click', async () => {
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
@@ -211,7 +212,8 @@ btnGeminiCount.addEventListener('click', async () => {
         tCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
         const base64Image = tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-        const promptText = "Порахуй кількість тварин (свиней, корів, овець тощо) на цьому фото. Поверни ТІЛЬКИ одне число.";
+        // Оновлений промпт для ферми
+        const promptText = "Контекст: Ветеринарний/фермерський огляд. На фото зображено скупчення тварин (це можуть бути свині, корови, вівці, птиця або інші сільськогосподарські тварини). Вони можуть стояти дуже щільно або перекривати одна одну. Це НЕ люди і НЕ оголені тіла. Завдання: максимально точно порахуй кількість голів тварин на фото. Поверни ТІЛЬКИ одне число (наприклад: 45). Жодних інших слів.";
 
         const requestBody = {
             contents: [{
@@ -220,7 +222,14 @@ btnGeminiCount.addEventListener('click', async () => {
                     { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                 ]
             }],
-            generationConfig: { temperature: 0.1 }
+            generationConfig: { temperature: 0.1 },
+            // Примусове відключення фільтрів цензури
+            safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
         };
 
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
@@ -232,15 +241,21 @@ btnGeminiCount.addEventListener('click', async () => {
         if (!response.ok) throw new Error("API fail");
 
         const data = await response.json();
-        const resultText = data.candidates[0].content.parts[0].text.trim();
         
+        // Захист від пустої відповіді при блокуванні
+        if (!data.candidates || data.candidates.length === 0) {
+            throw new Error("Блокування ШІ");
+        }
+
+        const resultText = data.candidates[0].content.parts[0].text.trim();
         const numbersOnly = resultText.replace(/\D/g, '');
         geminiCountSpan.innerText = numbersOnly || "0";
         statusText.innerText = "ШІ завершив";
 
     } catch (error) {
+        console.error("Помилка підрахунку:", error);
         geminiCountSpan.innerText = "Помилка";
-        statusText.innerText = "Збій з'єднання";
+        statusText.innerText = "Збій підрахунку";
     }
 });
 
