@@ -4,6 +4,7 @@ const ctx = canvas.getContext('2d');
 const btnCapture = document.getElementById('btn-capture');
 const btnGeminiCount = document.getElementById('btn-gemini-count');
 const btnSettings = document.getElementById('btn-settings');
+const targetSelect = document.getElementById('target-select');
 const crosshair = document.getElementById('crosshair');
 const statusText = document.getElementById('status-text');
 const resultPanel = document.getElementById('result-panel');
@@ -54,7 +55,6 @@ async function init() {
     await loadModel();
 }
 
-// Алгоритм NMS (Intersection over Union)
 function calculateIoU(box1, box2) {
     const [x1, y1, w1, h1] = box1;
     const [x2, y2, w2, h2] = box2;
@@ -84,7 +84,7 @@ function processAndDraw() {
     filtered.sort((a, b) => b.score - a.score);
 
     const finalPredictions = [];
-    const iouThreshold = 0.3; // Відсікання дублікатів (перекриття > 30%)
+    const iouThreshold = 0.3; 
 
     for (let i = 0; i < filtered.length; i++) {
         let keep = true;
@@ -97,9 +97,13 @@ function processAndDraw() {
         if (keep) finalPredictions.push(filtered[i]);
     }
 
+    // Сортування за площею (від найбільших до найменших) і зріз до 20 об'єктів
+    finalPredictions.sort((a, b) => (b.bbox[2] * b.bbox[3]) - (a.bbox[2] * a.bbox[3]));
+    const top20Predictions = finalPredictions.slice(0, 20);
+
     let count = 0;
 
-    finalPredictions.forEach(pred => {
+    top20Predictions.forEach(pred => {
         count++;
         const [x, y, width, height] = pred.bbox;
         
@@ -123,7 +127,6 @@ function processAndDraw() {
     objectCountSpan.innerText = count;
 }
 
-// Логіка інтерфейсу
 function resetSettingsTimer() {
     clearTimeout(settingsTimeout);
     slidersBox.classList.add('active');
@@ -169,6 +172,7 @@ async function toggleCapture() {
 
         btnSettings.style.display = 'block';
         resultPanel.style.display = 'block';
+        targetSelect.style.display = 'block'; // Вивід селектора
         btnGeminiCount.style.display = 'block'; 
         
         statusText.innerText = "Кадр зафіксовано";
@@ -184,6 +188,7 @@ async function toggleCapture() {
         slidersBox.classList.remove('active');
         clearTimeout(settingsTimeout);
         resultPanel.style.display = 'none';
+        targetSelect.style.display = 'none'; // Сховати селектор
         btnGeminiCount.style.display = 'none';
         geminiResultPanel.style.display = 'none';
         
@@ -192,7 +197,6 @@ async function toggleCapture() {
     }
 }
 
-// ОНОВЛЕНИЙ БЛОК ШІ-ЛІЧИЛЬНИКА
 btnGeminiCount.addEventListener('click', async () => {
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
@@ -212,8 +216,8 @@ btnGeminiCount.addEventListener('click', async () => {
         tCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
         const base64Image = tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-        // Оновлений промпт для ферми
-        const promptText = "Контекст: Ветеринарний/фермерський огляд. На фото зображено скупчення тварин (це можуть бути свині, корови, вівці, птиця або інші сільськогосподарські тварини). Вони можуть стояти дуже щільно або перекривати одна одну. Це НЕ люди і НЕ оголені тіла. Завдання: максимально точно порахуй кількість голів тварин на фото. Поверни ТІЛЬКИ одне число (наприклад: 45). Жодних інших слів.";
+        const target = targetSelect.value;
+        const promptText = `Контекст: Ветеринарний/фермерський огляд. Завдання: максимально точно порахуй цільові об'єкти на фотографії. Цільові об'єкти: ${target}. Поверни ТІЛЬКИ одне число. Жодних інших слів.`;
 
         const requestBody = {
             contents: [{
@@ -223,7 +227,6 @@ btnGeminiCount.addEventListener('click', async () => {
                 ]
             }],
             generationConfig: { temperature: 0.1 },
-            // Примусове відключення фільтрів цензури
             safetySettings: [
                 { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
                 { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -242,7 +245,6 @@ btnGeminiCount.addEventListener('click', async () => {
 
         const data = await response.json();
         
-        // Захист від пустої відповіді при блокуванні
         if (!data.candidates || data.candidates.length === 0) {
             throw new Error("Блокування ШІ");
         }
